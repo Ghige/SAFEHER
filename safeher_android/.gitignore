@@ -1,0 +1,19 @@
+# SafeHer Android
+/.gradle/
+/.idea/
+/**/build/
+/**/local.properties
+*.iml
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+captures/
+.externalNativeBuild/
+.cxx/
+*.log
+.DS_Store
+*.keystore
+!debug.keystore
+google-services.json
