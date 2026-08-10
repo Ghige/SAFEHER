@@ -15,7 +15,15 @@ SAFEHER/
 ├── safeher_ai/          # YAMNet training / export pipeline + model artifacts
 ├── safeher_web/         # Static emergency contact track page
 ├── PRODUCTION_SETUP.md  # Production DNS / Firebase / WhatsApp checklist
+├── TEAM_HANDOVER.pdf    # Short team onboarding PDF (setup, pending work, tests)
 └── README.md            # This file
+```
+
+For a printable onboarding summary (Python 3.11 → venv → requirements → credentials, pending AI wallet work, and test cases), open **TEAM_HANDOVER.pdf**. Regenerate with:
+
+```bash
+pip install fpdf2
+python scripts/generate_handover_pdf.py
 ```
 
 **Not in Git (keep locally / share privately):**

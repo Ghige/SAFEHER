@@ -1,10 +1,12 @@
 # SafeHer — AI Training Pipeline Dependencies
+# Recommended: Python 3.11.x
 # Install with: pip install -r requirements_training.txt
+#
+# Note: TensorFlow 2.15 works best on Python 3.11 (not 3.12+).
 
 # Core audio processing
 librosa==0.10.1
 soundfile==0.12.1
-
 
 # ML / Training
 tensorflow==2.15.0
@@ -15,5 +17,5 @@ scikit-learn==1.4.0
 numpy==1.26.4
 pandas==2.2.0
 
-# Progress bars
+# Progress bars / logs
 tqdm==4.66.2

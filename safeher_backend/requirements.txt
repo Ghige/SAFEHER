@@ -1,17 +1,36 @@
-fastapi
-uvicorn
-sqlalchemy
-alembic
-python-jose[cryptography]
-passlib[bcrypt]
-python-multipart
-pydantic
-pydantic-settings
-python-dotenv
-psycopg2-binary
-email-validator
-bcrypt
-firebase-admin
-redis
-httpx
-pytest
+# SafeHer Backend — Python dependencies
+# Recommended: Python 3.11.x
+# Install: pip install -r requirements.txt
+
+# API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Config / validation
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+email-validator==2.2.0
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# Auth / security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+cryptography==44.0.0
+
+# Integrations
+firebase-admin==6.6.0
+redis==5.2.1
+httpx==0.28.1
+
+# AI helpers used by backend scorers / optional TFLite path
+numpy==1.26.4
+
+# Tests
+pytest==8.3.4
