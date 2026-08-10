@@ -42,5 +42,13 @@ class LocationUpdate(BaseModel):
     longitude: float = Field(..., ge=-180, le=180)
 
 
+class AlertTriggerResponse(AlertResponse):
+    """Alert trigger response including WhatsApp delivery summary."""
+
+    whatsapp_sent_count: int = 0
+    whatsapp_failed_count: int = 0
+    whatsapp_all_delivered: bool = False
+
+
 class PingRequest(BaseModel):
     alert_id: UUID

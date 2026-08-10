@@ -1,8 +1,11 @@
 package com.safeher.app.domain.repository
 
 import com.safeher.app.domain.model.SafetyAlert
+import kotlinx.coroutines.flow.Flow
 
 interface AlertRepository {
+
+    fun observePendingSos(): Flow<Boolean>
 
     suspend fun triggerAlert(latitude: Double?, longitude: Double?): Result<SafetyAlert>
 

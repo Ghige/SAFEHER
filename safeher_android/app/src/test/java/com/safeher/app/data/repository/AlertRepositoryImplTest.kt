@@ -1,15 +1,18 @@
 package com.safeher.app.data.repository
 
+import com.safeher.app.core.datastore.PendingSosStore
 import com.safeher.app.core.network.AlertsApi
 import com.safeher.app.core.network.NetworkMonitor
 import com.safeher.app.data.remote.dto.AlertResponseDto
 import com.safeher.app.data.remote.dto.TriggerAlertRequestDto
+import com.safeher.app.services.SosTriggerScheduler
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
@@ -26,6 +29,8 @@ class AlertRepositoryImplTest {
 
     private val api: AlertsApi = mockk()
     private val networkMonitor: NetworkMonitor = mockk()
+    private val pendingSosStore: PendingSosStore = mockk(relaxed = true)
+    private val sosTriggerScheduler: SosTriggerScheduler = mockk(relaxed = true)
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private lateinit var repository: AlertRepositoryImpl
 
@@ -43,7 +48,8 @@ class AlertRepositoryImplTest {
     @Before
     fun setup() {
         every { networkMonitor.isOnline } returns flowOf(true)
-        repository = AlertRepositoryImpl(api, networkMonitor, moshi)
+        every { pendingSosStore.hasPending } returns flowOf(false)
+        repository = AlertRepositoryImpl(api, networkMonitor, moshi, pendingSosStore, sosTriggerScheduler)
     }
 
     @Test
@@ -127,12 +133,15 @@ class AlertRepositoryImplTest {
     }
 
     @Test
-    fun triggerAlert_offline_returnsFailure() = runTest {
+    fun triggerAlert_offline_queuesAndReturnsQueuedException() = runTest {
+        coEvery { pendingSosStore.save(any()) } returns Unit
         every { networkMonitor.isOnline } returns flowOf(false)
 
-        val result = repository.triggerAlert(null, null)
+        val result = repository.triggerAlert(12.97, 77.59)
 
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()!!.message!!.contains("offline", ignoreCase = true))
+        assertTrue(result.exceptionOrNull() is OfflineSosQueuedException)
+        coVerify { pendingSosStore.save(any()) }
+        verify { sosTriggerScheduler.scheduleFlush() }
     }
 }

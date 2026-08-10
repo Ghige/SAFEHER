@@ -16,6 +16,7 @@ class SessionCleanupManagerTest {
     private val aiMonitoringCoordinator: AiMonitoringCoordinator = mockk(relaxed = true)
     private val alertSessionManager: AlertSessionManager = mockk(relaxed = true)
     private val authSessionManager: AuthSessionManager = mockk(relaxed = true)
+    private val userRepository: com.safeher.app.domain.repository.UserRepository = mockk(relaxed = true)
     private lateinit var manager: SessionCleanupManager
 
     @Before
@@ -28,6 +29,7 @@ class SessionCleanupManagerTest {
             aiMonitoringCoordinator,
             alertSessionManager,
             authSessionManager,
+            userRepository,
         )
     }
 
@@ -39,6 +41,7 @@ class SessionCleanupManagerTest {
             locationTrackingService.stopTracking()
             aiMonitoringCoordinator.stopMonitoring()
             alertSessionManager.clearActiveAlert()
+            userRepository.clearProfileCache()
             authSessionManager.logout()
         }
     }
@@ -51,6 +54,7 @@ class SessionCleanupManagerTest {
             locationTrackingService.stopTracking()
             aiMonitoringCoordinator.stopMonitoring()
             alertSessionManager.clearActiveAlert()
+            userRepository.clearProfileCache()
             authSessionManager.onSessionExpired()
         }
     }

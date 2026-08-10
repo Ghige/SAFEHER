@@ -1,5 +1,6 @@
 package com.safeher.app.core.session
 
+import com.safeher.app.domain.repository.UserRepository
 import com.safeher.app.services.LocationTrackingService
 import com.safeher.app.services.AiMonitoringCoordinator
 import javax.inject.Inject
@@ -11,6 +12,7 @@ class SessionCleanupManager @Inject constructor(
     private val aiMonitoringCoordinator: AiMonitoringCoordinator,
     private val alertSessionManager: AlertSessionManager,
     private val authSessionManager: AuthSessionManager,
+    private val userRepository: UserRepository,
 ) {
 
     suspend fun stopTrackingAndClearAlert() {
@@ -21,11 +23,13 @@ class SessionCleanupManager @Inject constructor(
 
     suspend fun performLogout() {
         stopTrackingAndClearAlert()
+        userRepository.clearProfileCache()
         authSessionManager.logout()
     }
 
     suspend fun performSessionExpired() {
         stopTrackingAndClearAlert()
+        userRepository.clearProfileCache()
         authSessionManager.onSessionExpired()
     }
 }

@@ -144,15 +144,34 @@ class AiMonitoringViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            coordinator.riskAssessment.collect { assessment ->
+                _uiState.update {
+                    it.copy(
+                        riskLevelLabel = assessment?.riskLevel?.name,
+                        rollingConfidence = assessment?.rollingAverage,
+                        riskAssessment = assessment,
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             coordinator.events.collect { event ->
                 when (event) {
                     AiCoordinatorEvent.NavigateToSosCountdown ->
                         _events.emit(AiMonitoringEvent.NavigateToSosCountdown)
                     AiCoordinatorEvent.NavigateToActiveAlert ->
                         _events.emit(AiMonitoringEvent.NavigateToActiveAlert)
+                    is AiCoordinatorEvent.ShowEmergencyConfirmation -> {
+                        _uiState.update { it.copy(pendingEmergencyConfirmation = true) }
+                    }
                 }
             }
         }
+    }
+
+    fun onEmergencyConfirmation(confirmedEmergency: Boolean) {
+        _uiState.update { it.copy(pendingEmergencyConfirmation = false) }
+        coordinator.onEmergencyConfirmation(confirmedEmergency)
     }
 
     private fun observeNetwork() {

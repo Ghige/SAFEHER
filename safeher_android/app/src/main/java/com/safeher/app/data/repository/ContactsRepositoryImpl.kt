@@ -1,6 +1,6 @@
 package com.safeher.app.data.repository
 
-import com.safeher.app.core.network.ApiErrorParser
+import com.safeher.app.core.network.RepositoryApiCall
 import com.safeher.app.core.network.ContactsApi
 import com.safeher.app.core.network.NetworkMonitor
 import com.safeher.app.data.remote.dto.ContactDto
@@ -8,7 +8,6 @@ import com.safeher.app.data.remote.dto.CreateContactRequestDto
 import com.safeher.app.domain.model.EmergencyContact
 import com.safeher.app.domain.repository.ContactsRepository
 import com.squareup.moshi.Moshi
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,19 +18,18 @@ class ContactsRepositoryImpl @Inject constructor(
     private val moshi: Moshi,
 ) : ContactsRepository {
 
-    override suspend fun getContacts(): Result<List<EmergencyContact>> {
-        return apiCall {
+    override suspend fun getContacts(): Result<List<EmergencyContact>> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
             api.getContacts().map { it.toDomain() }
         }
-    }
 
     override suspend fun addContact(
         name: String,
         phoneNumber: String,
         relationship: String,
         ringPriority: Int,
-    ): Result<EmergencyContact> {
-        return apiCall {
+    ): Result<EmergencyContact> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
             api.createContact(
                 CreateContactRequestDto(
                     name = name.trim(),
@@ -41,25 +39,11 @@ class ContactsRepositoryImpl @Inject constructor(
                 ),
             ).toDomain()
         }
-    }
 
-    override suspend fun deleteContact(contactId: String): Result<Unit> {
-        return apiCall {
+    override suspend fun deleteContact(contactId: String): Result<Unit> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
             api.deleteContact(contactId)
         }
-    }
-
-    private suspend inline fun <T> apiCall(block: () -> T): Result<T> {
-        return try {
-            if (!networkMonitor.isOnline.first()) {
-                Result.failure(Exception("You are offline. Connect to the internet and try again."))
-            } else {
-                Result.success(block())
-            }
-        } catch (e: Exception) {
-            Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
-        }
-    }
 
     private fun ContactDto.toDomain() = EmergencyContact(
         id = id,

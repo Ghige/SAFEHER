@@ -11,44 +11,37 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContactEmergency
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.safeher.app.R
+import com.safeher.app.core.designsystem.SafeHerIcons
+import com.safeher.app.core.designsystem.components.PinkWaveform
+import com.safeher.app.feature.home.components.ContactAvatarRow
 import com.safeher.app.feature.home.components.ErrorType
 import com.safeher.app.feature.home.components.ErrorView
+import com.safeher.app.feature.home.components.FeatureNavCard
+import com.safeher.app.feature.home.components.HomeHeader
 import com.safeher.app.feature.home.components.LoadingView
 import com.safeher.app.feature.home.components.OfflineBanner
-import com.safeher.app.feature.home.components.ProfileCard
-import com.safeher.app.feature.home.components.QuickActionCard
-import com.safeher.app.feature.home.components.StatusCard
+import com.safeher.app.feature.home.components.SafeHerQuickActionTile
+import com.safeher.app.feature.home.components.SafetyReassuranceCard
+import com.safeher.app.feature.sos.components.HomeSosSection
 import kotlinx.coroutines.flow.collectLatest
-
-private data class QuickActionItem(
-    val feature: QuickActionFeature,
-    val icon: ImageVector,
-)
 
 @Composable
 fun DashboardScreen(
     onNavigateToComingSoon: (String) -> Unit,
+    onSosClick: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -89,8 +82,11 @@ fun DashboardScreen(
             }
             uiState.profile != null -> DashboardContent(
                 uiState = uiState,
-                onQuickAction = viewModel::onQuickAction,
+                onSosClick = onSosClick,
+                onNavigate = { feature -> viewModel.onNavigate(feature) },
+                onMenuClick = onNavigateToSettings,
             )
+            else -> LoadingView()
         }
     }
 }
@@ -98,82 +94,132 @@ fun DashboardScreen(
 @Composable
 private fun DashboardContent(
     uiState: DashboardUiState,
-    onQuickAction: (QuickActionFeature) -> Unit,
+    onSosClick: () -> Unit,
+    onNavigate: (QuickActionFeature) -> Unit,
+    onMenuClick: () -> Unit,
 ) {
     val profile = uiState.profile ?: return
+    val contactCount = uiState.emergencyContacts.size
+    val contactNames = uiState.emergencyContacts.map { it.name }
 
-    val quickActions = listOf(
-        QuickActionItem(QuickActionFeature.CONTACTS, Icons.Default.ContactEmergency),
-        QuickActionItem(QuickActionFeature.SOS, Icons.Default.Shield),
-        QuickActionItem(QuickActionFeature.AI, Icons.Default.Psychology),
-        QuickActionItem(QuickActionFeature.HELPERS, Icons.Default.People),
-        QuickActionItem(QuickActionFeature.LIVE_LOCATION, Icons.Default.LocationOn),
-        QuickActionItem(QuickActionFeature.SETTINGS, Icons.Default.Settings),
-    )
+    val aiStatusLabel = when (uiState.aiStatus) {
+        AiHomeStatus.NORMAL -> stringResource(R.string.ai_status_normal)
+        AiHomeStatus.LISTENING -> stringResource(R.string.ai_status_listening)
+        AiHomeStatus.DETECTING -> stringResource(R.string.ai_status_detecting)
+        AiHomeStatus.OFF -> stringResource(R.string.ai_status_off)
+    }
+
+    val locationStatusLabel = if (uiState.isLocationSharingActive) {
+        stringResource(R.string.status_active)
+    } else {
+        stringResource(R.string.status_inactive)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            text = stringResource(R.string.dashboard_welcome, profile.name),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+        HomeHeader(
+            userName = profile.name,
+            isProtected = profile.isVerified,
+            onMenuClick = onMenuClick,
+            onNotificationClick = onMenuClick,
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.dashboard_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+        HomeSosSection(
+            onSosClick = onSosClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
         )
-        Spacer(modifier = Modifier.height(20.dp))
 
-        ProfileCard(profile = profile)
-        Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FeatureNavCard(
+                title = stringResource(R.string.home_live_location_title),
+                subtitle = stringResource(R.string.home_sharing_with_contacts, contactCount.coerceAtLeast(0)),
+                statusLabel = locationStatusLabel,
+                isActive = uiState.isLocationSharingActive,
+                icon = SafeHerIcons.Location,
+                onClick = { onNavigate(QuickActionFeature.LIVE_LOCATION) },
+            )
 
-        StatusCard(
-            title = if (profile.isVerified) {
-                stringResource(R.string.status_verified)
-            } else {
-                stringResource(R.string.status_unverified)
-            },
-            subtitle = if (profile.isVerified) {
-                stringResource(R.string.dashboard_verified_subtitle)
-            } else {
-                stringResource(R.string.dashboard_unverified_subtitle)
-            },
-            icon = Icons.Default.Shield,
-        )
-        Spacer(modifier = Modifier.height(24.dp))
+            FeatureNavCard(
+                title = stringResource(R.string.home_ai_voice_title),
+                subtitle = stringResource(R.string.home_ai_voice_subtitle),
+                statusLabel = aiStatusLabel,
+                isActive = uiState.aiStatus == AiHomeStatus.LISTENING ||
+                    uiState.aiStatus == AiHomeStatus.DETECTING,
+                icon = SafeHerIcons.Microphone,
+                onClick = { onNavigate(QuickActionFeature.AI) },
+                trailingContent = {
+                    PinkWaveform(
+                        isActive = uiState.aiIsMonitoring,
+                        modifier = Modifier
+                            .fillMaxWidth(0.35f)
+                            .height(32.dp),
+                        barCount = 12,
+                    )
+                },
+            )
 
-        Text(
-            text = stringResource(R.string.dashboard_quick_actions),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+            FeatureNavCard(
+                title = stringResource(R.string.action_contacts),
+                subtitle = stringResource(R.string.home_contacts_saved, contactCount),
+                statusLabel = stringResource(R.string.home_contacts_status),
+                isActive = contactCount > 0,
+                icon = SafeHerIcons.EmergencyContacts,
+                onClick = { onNavigate(QuickActionFeature.CONTACTS) },
+                trailingContent = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (contactNames.isNotEmpty()) {
+                            ContactAvatarRow(names = contactNames)
+                        }
+                        androidx.compose.material3.Icon(
+                            imageVector = SafeHerIcons.Forward,
+                            contentDescription = null,
+                            tint = com.safeher.app.core.designsystem.SafeHerTextSecondary,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
+                },
+            )
 
-        quickActions.chunked(2).forEach { rowItems ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                rowItems.forEach { item ->
-                    QuickActionCard(
-                        title = stringResource(item.feature.titleRes),
-                        icon = item.icon,
-                        onClick = { onQuickAction(item.feature) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (rowItems.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                SafeHerQuickActionTile(
+                    title = stringResource(R.string.home_quick_ai),
+                    subtitle = aiStatusLabel,
+                    icon = SafeHerIcons.Microphone,
+                    onClick = { onNavigate(QuickActionFeature.AI) },
+                    modifier = Modifier.weight(1f),
+                )
+                SafeHerQuickActionTile(
+                    title = stringResource(R.string.home_quick_contacts),
+                    subtitle = stringResource(R.string.home_contacts_saved, contactCount),
+                    icon = SafeHerIcons.EmergencyContacts,
+                    onClick = { onNavigate(QuickActionFeature.CONTACTS) },
+                    modifier = Modifier.weight(1f),
+                )
+                SafeHerQuickActionTile(
+                    title = stringResource(R.string.home_quick_history),
+                    subtitle = stringResource(R.string.home_quick_history_sub),
+                    icon = SafeHerIcons.History,
+                    onClick = { onNavigate(QuickActionFeature.HISTORY) },
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+
+            SafetyReassuranceCard()
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.safeher.app.R
 import kotlinx.coroutines.flow.collectLatest
+import timber.log.Timber
 
 @Composable
 fun LoginScreen(
@@ -37,6 +38,10 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(uiState.isLoading, uiState.error) {
+        Timber.d("LoginScreen: isLoading=%s error=%s", uiState.isLoading, uiState.error)
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->

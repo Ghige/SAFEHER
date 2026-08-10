@@ -10,5 +10,6 @@ enum class QuickActionFeature(val routeKey: String, val titleRes: Int) {
     AI("ai", com.safeher.app.R.string.action_ai),
     HELPERS("helpers", com.safeher.app.R.string.action_helpers),
     LIVE_LOCATION("live_location", com.safeher.app.R.string.action_live_location),
+    HISTORY("history", com.safeher.app.R.string.nav_history),
     SETTINGS("settings", com.safeher.app.R.string.action_settings),
 }

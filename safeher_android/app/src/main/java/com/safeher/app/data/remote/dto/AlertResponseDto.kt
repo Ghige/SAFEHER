@@ -12,4 +12,7 @@ data class AlertResponseDto(
     val started_at: String,
     val ended_at: String? = null,
     val evidence_url: String? = null,
+    val whatsapp_sent_count: Int? = null,
+    val whatsapp_failed_count: Int? = null,
+    val whatsapp_all_delivered: Boolean? = null,
 )

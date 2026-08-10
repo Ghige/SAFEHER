@@ -1,6 +1,7 @@
 package com.safeher.app.feature.sos
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -20,15 +20,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.safeher.app.core.session.AlertSessionManager
 import com.safeher.app.R
 import com.safeher.app.feature.home.components.OfflineBanner
 import com.safeher.app.feature.sos.components.ActiveAlertCard
 import com.safeher.app.feature.sos.components.LoadingSOS
+import com.safeher.app.feature.sos.components.SosAlertWarningBanner
+import com.safeher.app.feature.sos.components.SosGradientBackground
 import kotlinx.coroutines.flow.collectLatest
+import timber.log.Timber
 
 @Composable
 fun ActiveAlertScreen(
@@ -38,6 +43,16 @@ fun ActiveAlertScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.isLoading, uiState.activeAlert?.id, uiState.activeAlert?.status) {
+        Timber.d(
+            "ActiveAlertScreen: isLoading=%s alertId=%s status=%s ongoing=%s",
+            uiState.isLoading,
+            uiState.activeAlert?.id,
+            uiState.activeAlert?.status,
+            uiState.activeAlert?.isOngoing,
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
@@ -61,46 +76,76 @@ fun ActiveAlertScreen(
         )
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding)
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (uiState.isOffline) {
-                Surface(color = MaterialTheme.colorScheme.errorContainer) {
-                    OfflineBanner()
-                }
-            }
-
-            when {
-                uiState.isLoading -> LoadingSOS()
-                uiState.activeAlert?.isOngoing == true -> {
-                    ActiveAlertCard(alert = uiState.activeAlert!!)
-                    Text(
-                        text = stringResource(R.string.sos_heartbeat_info),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = viewModel::requestCancelActiveAlert,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                        ),
-                        enabled = !uiState.isOffline,
-                    ) {
-                        Text(stringResource(R.string.sos_cancel_button))
+    Box(modifier = Modifier.fillMaxSize()) {
+        SosGradientBackground(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (uiState.isOffline) {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                        OfflineBanner()
                     }
                 }
-                else -> LoadingSOS()
+
+                when {
+                    uiState.isLoading -> LoadingSOS()
+                    uiState.activeAlert?.status == AlertSessionManager.RESTORING_STATUS ->
+                        LoadingSOS(message = stringResource(R.string.sos_loading))
+                    uiState.activeAlert?.isOngoing == true -> {
+                        val alert = uiState.activeAlert!!
+                        ActiveAlertCard(alert = alert)
+                        val sentCount = alert.whatsappSentCount ?: 0
+                        val failedCount = alert.whatsappFailedCount ?: 0
+                        if (uiState.whatsappWarning != null) {
+                            SosAlertWarningBanner(message = uiState.whatsappWarning.orEmpty())
+                        } else if (sentCount > 0 && alert.whatsappAllDelivered == true) {
+                            SosAlertWarningBanner(
+                                message = stringResource(R.string.sos_whatsapp_all_delivered, sentCount),
+                            )
+                        } else if (sentCount > 0 && failedCount > 0) {
+                            SosAlertWarningBanner(
+                                message = stringResource(
+                                    R.string.sos_whatsapp_partial,
+                                    sentCount,
+                                    sentCount + failedCount,
+                                ),
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.sos_heartbeat_info),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (uiState.heartbeatWarning) {
+                            SosAlertWarningBanner(
+                                message = stringResource(R.string.sos_heartbeat_warning),
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = viewModel::requestCancelActiveAlert,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                            ),
+                            enabled = !uiState.isOffline,
+                        ) {
+                            Text(stringResource(R.string.sos_cancel_button))
+                        }
+                    }
+                    else -> LoadingSOS(message = stringResource(R.string.sos_loading))
+                }
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+        )
     }
 }

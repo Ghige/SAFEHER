@@ -1,10 +1,12 @@
 package com.safeher.app.services
 
 import com.safeher.app.core.session.AlertSessionManager
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,10 +38,18 @@ class LocationTrackingCoordinator @Inject constructor(
 
 @Singleton
 class ApplicationCoroutineScope @Inject constructor() {
-    val scope = CoroutineScope(SupervisorJob())
+    val scope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
+            Timber.e(throwable, "Uncaught exception in application coroutine scope")
+        },
+    )
 }
 
 @Singleton
 class ServiceCoroutineScope @Inject constructor() {
-    val scope = CoroutineScope(SupervisorJob())
+    val scope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
+            Timber.e(throwable, "Uncaught exception in service coroutine scope")
+        },
+    )
 }

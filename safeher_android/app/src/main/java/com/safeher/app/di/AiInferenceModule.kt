@@ -1,9 +1,9 @@
 package com.safeher.app.di
 
 import com.safeher.app.services.ai.AudioInferenceEngine
-import com.safeher.app.services.ai.MissingAudioInferenceEngine
 import com.safeher.app.services.ai.MissingMovementInferenceEngine
 import com.safeher.app.services.ai.MovementInferenceEngine
+import com.safeher.app.services.ai.TfliteAudioInferenceEngine
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -16,7 +16,7 @@ abstract class AiInferenceModule {
 
     @Binds
     @Singleton
-    abstract fun bindAudioInferenceEngine(impl: MissingAudioInferenceEngine): AudioInferenceEngine
+    abstract fun bindAudioInferenceEngine(impl: TfliteAudioInferenceEngine): AudioInferenceEngine
 
     @Binds
     @Singleton

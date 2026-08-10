@@ -8,6 +8,8 @@ import com.safeher.app.domain.repository.AlertRepository
 import com.safeher.app.domain.repository.AuthRepository
 import com.safeher.app.domain.repository.ContactsRepository
 import com.safeher.app.domain.repository.UserRepository
+import com.safeher.app.data.repository.SettingsRepositoryImpl
+import com.safeher.app.domain.repository.SettingsRepository
 import com.safeher.app.data.repository.AiRepositoryImpl
 import com.safeher.app.data.repository.HelpersRepositoryImpl
 import com.safeher.app.data.repository.LocationRepositoryImpl
@@ -51,4 +53,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAiRepository(impl: AiRepositoryImpl): AiRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
 }

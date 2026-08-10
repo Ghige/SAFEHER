@@ -7,5 +7,7 @@ interface UserRepository {
 
     fun observeNetworkStatus(): Flow<Boolean>
 
-    suspend fun getProfile(): Result<UserProfile>
+    suspend fun getProfile(forceRefresh: Boolean = false): Result<UserProfile>
+
+    fun clearProfileCache()
 }

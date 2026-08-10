@@ -49,10 +49,19 @@ import com.safeher.app.feature.helpers.HelpersScreen
 import com.safeher.app.feature.helpers.HelpersViewModel
 import com.safeher.app.feature.location.LocationPermissionScreen
 import com.safeher.app.feature.location.LocationScreen
-import com.safeher.app.feature.location.LocationSettingsScreen
 import com.safeher.app.feature.location.TrackLocationScreen
+import com.safeher.app.feature.settings.AboutScreen
+import com.safeher.app.feature.settings.BatteryOptimizationScreen
+import com.safeher.app.feature.settings.NotificationSettingsScreen
+import com.safeher.app.feature.settings.PermissionScreen
+import com.safeher.app.feature.settings.PrivacyPolicyScreen
+import com.safeher.app.feature.settings.SecurityScreen
+import com.safeher.app.feature.settings.SettingsEvent
+import com.safeher.app.feature.settings.SettingsScreen
+import com.safeher.app.feature.settings.TermsScreen
 import com.safeher.app.feature.sos.rememberSosViewModel
 import kotlinx.coroutines.flow.collectLatest
+import timber.log.Timber
 
 object DashboardRoutes {
     const val DASHBOARD = "dashboard"
@@ -68,17 +77,32 @@ fun DashboardNavigation(
     val currentRoute = backStackEntry?.destination?.route
     val sosViewModel = rememberSosViewModel()
 
+    LaunchedEffect(currentRoute) {
+        Timber.d("DashboardNavigation: currentRoute=%s", currentRoute)
+    }
+
     LaunchedEffect(Unit) {
-        sosViewModel.restoreActiveAlert()
+        Timber.d("DashboardNavigation: syncActiveAlertUi")
+        sosViewModel.syncActiveAlertUi()
     }
 
     LaunchedEffect(Unit) {
         sosViewModel.events.collectLatest { event ->
             when (event) {
                 SOSEvent.NavigateToActive -> {
-                    navController.navigate(Route.SOS_ACTIVE) {
+                    val route = navController.currentBackStackEntry?.destination?.route
+                    if (route != Route.SOS_ACTIVE) {
+                        Timber.d("DashboardNavigation: navigate to SOS_ACTIVE from %s", route)
+                        navController.navigate(Route.SOS_ACTIVE) {
+                            launchSingleTop = true
+                        }
+                    }
+                }
+                SOSEvent.NavigateToCountdown -> {
+                    navController.navigate(Route.SOS_COUNTDOWN) {
                         launchSingleTop = true
                     }
+                    sosViewModel.startCountdown()
                 }
                 else -> Unit
             }
@@ -86,15 +110,30 @@ fun DashboardNavigation(
     }
 
     val showBottomBar = currentRoute == DashboardRoutes.DASHBOARD ||
-        currentRoute == DashboardRoutes.PROFILE
+        currentRoute == DashboardRoutes.PROFILE ||
+        currentRoute == Route.SOS ||
+        currentRoute == Route.SOS_HISTORY ||
+        currentRoute == Route.AI
+
+    val screensWithOwnHeader = setOf(
+        DashboardRoutes.DASHBOARD,
+        DashboardRoutes.PROFILE,
+        Route.SOS,
+        Route.SOS_HISTORY,
+        Route.AI,
+        Route.LOCATION,
+    )
 
     val showBack = currentRoute?.startsWith("coming_soon") == true ||
         currentRoute == Route.CONTACTS ||
         currentRoute == Route.ADD_CONTACT ||
-        currentRoute?.startsWith("sos") == true ||
-        currentRoute?.startsWith("location") == true ||
+        (currentRoute?.startsWith("sos") == true && currentRoute !in screensWithOwnHeader) ||
+        (currentRoute?.startsWith("location") == true && currentRoute != Route.LOCATION) ||
         currentRoute?.startsWith("helpers") == true ||
-        currentRoute?.startsWith("ai") == true
+        (currentRoute?.startsWith("ai") == true && currentRoute != Route.AI) ||
+        currentRoute?.startsWith("settings") == true
+
+    val showTopBar = !screensWithOwnHeader.contains(currentRoute) && showBack
 
     val topBarTitle = when (currentRoute) {
         DashboardRoutes.PROFILE -> stringResource(R.string.nav_profile)
@@ -105,7 +144,6 @@ fun DashboardNavigation(
         Route.SOS_HISTORY -> stringResource(R.string.sos_view_history)
         Route.LOCATION -> stringResource(R.string.action_live_location)
         Route.LOCATION_PERMISSION -> stringResource(R.string.location_permission_title)
-        Route.LOCATION_SETTINGS -> stringResource(R.string.location_settings_title)
         Route.LOCATION_TRACK -> stringResource(R.string.location_track_title)
         Route.HELPERS -> stringResource(R.string.action_helpers)
         Route.HELPER_PROFILE -> stringResource(R.string.helpers_profile_title)
@@ -113,11 +151,21 @@ fun DashboardNavigation(
         Route.AI -> stringResource(R.string.action_ai)
         Route.AI_STATUS -> stringResource(R.string.ai_status_title)
         Route.AI_SETTINGS -> stringResource(R.string.ai_settings_title)
+        Route.SETTINGS -> stringResource(R.string.action_settings)
+        Route.SETTINGS_PERMISSIONS -> stringResource(R.string.settings_permissions)
+        Route.SETTINGS_NOTIFICATIONS -> stringResource(R.string.settings_notifications_manage)
+        Route.SETTINGS_SECURITY -> stringResource(R.string.settings_security)
+        Route.SETTINGS_ABOUT -> stringResource(R.string.settings_about)
+        Route.SETTINGS_PRIVACY -> stringResource(R.string.settings_privacy_policy)
+        Route.SETTINGS_TERMS -> stringResource(R.string.settings_terms)
+        Route.SETTINGS_BATTERY -> stringResource(R.string.settings_battery)
         Route.COMING_SOON -> stringResource(R.string.coming_soon_title)
         else -> stringResource(R.string.app_name)
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
             HomeTopBar(
                 title = topBarTitle,
@@ -145,7 +193,9 @@ fun DashboardNavigation(
         NavHost(
             navController = navController,
             startDestination = DashboardRoutes.DASHBOARD,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
         ) {
             composable(DashboardRoutes.DASHBOARD) {
                 DashboardScreen(
@@ -161,15 +211,29 @@ fun DashboardNavigation(
                                 navController.navigate(Route.HELPERS)
                             QuickActionFeature.AI.routeKey ->
                                 navController.navigate(Route.AI)
+                            QuickActionFeature.HISTORY.routeKey ->
+                                navController.navigate(Route.SOS_HISTORY)
+                            QuickActionFeature.SETTINGS.routeKey ->
+                                navController.navigate(Route.SETTINGS)
                             else ->
                                 navController.navigate(Route.comingSoon(feature))
                         }
                     },
+                    onSosClick = {
+                        sosViewModel.onSosButtonClick()
+                    },
+                    onNavigateToSettings = { navController.navigate(Route.SETTINGS) },
                 )
             }
 
             composable(DashboardRoutes.PROFILE) {
-                ProfileScreen(onNavigateToLogin = onLogout)
+                ProfileScreen(
+                    onNavigateToLogin = onLogout,
+                    onNavigateToSettings = { navController.navigate(Route.SETTINGS) },
+                    onNavigateToContacts = { navController.navigate(Route.CONTACTS) },
+                    onNavigateToAbout = { navController.navigate(Route.SETTINGS_ABOUT) },
+                    onNavigateToSecurity = { navController.navigate(Route.SETTINGS_SECURITY) },
+                )
             }
 
             composable(
@@ -252,12 +316,6 @@ fun DashboardNavigation(
                 )
             }
 
-            composable(Route.LOCATION_SETTINGS) {
-                LocationSettingsScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                )
-            }
-
             composable(Route.LOCATION_TRACK) {
                 TrackLocationScreen()
             }
@@ -315,7 +373,69 @@ fun DashboardNavigation(
             composable(Route.AI_SETTINGS) {
                 AiSettingsScreen()
             }
+
+            composable(Route.SETTINGS) {
+                SettingsScreen(
+                    onNavigate = { event ->
+                        handleSettingsNavigation(
+                            event = event,
+                            navController = navController,
+                            onLogout = onLogout,
+                        )
+                    },
+                )
+            }
+
+            composable(Route.SETTINGS_PERMISSIONS) {
+                PermissionScreen()
+            }
+
+            composable(Route.SETTINGS_NOTIFICATIONS) {
+                NotificationSettingsScreen()
+            }
+
+            composable(Route.SETTINGS_SECURITY) {
+                SecurityScreen()
+            }
+
+            composable(Route.SETTINGS_ABOUT) {
+                AboutScreen(
+                    onNavigateToPrivacy = { navController.navigate(Route.SETTINGS_PRIVACY) },
+                    onNavigateToTerms = { navController.navigate(Route.SETTINGS_TERMS) },
+                )
+            }
+
+            composable(Route.SETTINGS_PRIVACY) {
+                PrivacyPolicyScreen()
+            }
+
+            composable(Route.SETTINGS_TERMS) {
+                TermsScreen()
+            }
+
+            composable(Route.SETTINGS_BATTERY) {
+                BatteryOptimizationScreen()
+            }
         }
+    }
+}
+
+private fun handleSettingsNavigation(
+    event: SettingsEvent,
+    navController: androidx.navigation.NavHostController,
+    onLogout: () -> Unit,
+) {
+    when (event) {
+        SettingsEvent.NavigateToLogin -> onLogout()
+        SettingsEvent.NavigateToProfile -> navController.navigate(DashboardRoutes.PROFILE)
+        SettingsEvent.NavigateToPermissions -> navController.navigate(Route.SETTINGS_PERMISSIONS)
+        SettingsEvent.NavigateToNotifications -> navController.navigate(Route.SETTINGS_NOTIFICATIONS)
+        SettingsEvent.NavigateToSecurity -> navController.navigate(Route.SETTINGS_SECURITY)
+        SettingsEvent.NavigateToAbout -> navController.navigate(Route.SETTINGS_ABOUT)
+        SettingsEvent.NavigateToPrivacy -> navController.navigate(Route.SETTINGS_PRIVACY)
+        SettingsEvent.NavigateToTerms -> navController.navigate(Route.SETTINGS_TERMS)
+        SettingsEvent.NavigateToBattery -> navController.navigate(Route.SETTINGS_BATTERY)
+        SettingsEvent.OpenAppSettings -> Unit
     }
 }
 

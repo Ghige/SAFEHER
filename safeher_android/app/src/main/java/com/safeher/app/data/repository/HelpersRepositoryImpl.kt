@@ -1,13 +1,12 @@
 package com.safeher.app.data.repository
 
-import com.safeher.app.core.network.ApiErrorParser
 import com.safeher.app.core.network.HelpersApi
 import com.safeher.app.core.network.NetworkMonitor
+import com.safeher.app.core.network.RepositoryApiCall
 import com.safeher.app.data.remote.dto.NearbyHelperDto
 import com.safeher.app.domain.model.NearbyHelper
 import com.safeher.app.domain.repository.HelpersRepository
 import com.squareup.moshi.Moshi
-import kotlinx.coroutines.flow.first
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,35 +18,24 @@ class HelpersRepositoryImpl @Inject constructor(
     private val moshi: Moshi,
 ) : HelpersRepository {
 
-    override suspend fun getNearbyHelpers(alertId: String): Result<List<NearbyHelper>> = apiCall {
-        api.getNearbyHelpers(alertId).map { it.toDomain() }
-    }
-
-    override suspend fun respondToAlert(alertId: String): Result<NearbyHelper> = apiCall {
-        api.respondToAlert(alertId).toDomain()
-    }
-
-    override suspend fun blockHelper(helperId: String): Result<Unit> = apiCall {
-        val response = api.blockHelper(helperId)
-        if (!response.isSuccessful) {
-            throw HttpException(response)
+    override suspend fun getNearbyHelpers(alertId: String): Result<List<NearbyHelper>> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
+            api.getNearbyHelpers(alertId).map { it.toDomain() }
         }
-        Unit
-    }
 
-    private suspend inline fun <T> apiCall(block: () -> T): Result<T> {
-        return try {
-            if (!networkMonitor.isOnline.first()) {
-                Result.failure(Exception("You are offline. Connect to the internet and try again."))
-            } else {
-                Result.success(block())
+    override suspend fun respondToAlert(alertId: String): Result<NearbyHelper> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
+            api.respondToAlert(alertId).toDomain()
+        }
+
+    override suspend fun blockHelper(helperId: String): Result<Unit> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
+            val response = api.blockHelper(helperId)
+            if (!response.isSuccessful) {
+                throw HttpException(response)
             }
-        } catch (e: HttpException) {
-            Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
-        } catch (e: Exception) {
-            Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
+            Unit
         }
-    }
 
     private fun NearbyHelperDto.toDomain() = NearbyHelper(
         id = id,

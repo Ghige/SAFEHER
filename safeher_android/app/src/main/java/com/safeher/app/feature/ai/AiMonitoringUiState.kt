@@ -2,6 +2,7 @@ package com.safeher.app.feature.ai
 
 import com.safeher.app.domain.model.AiConfidenceResult
 import com.safeher.app.services.AudioPermissionStatus
+import com.safeher.app.services.ai.AudioRiskAssessment
 
 data class AiMonitoringUiState(
     val isLoading: Boolean = false,
@@ -18,4 +19,8 @@ data class AiMonitoringUiState(
     val audioPermissionStatus: AudioPermissionStatus = AudioPermissionStatus.DENIED,
     val error: String? = null,
     val snackbarMessage: String? = null,
+    val pendingEmergencyConfirmation: Boolean = false,
+    val riskLevelLabel: String? = null,
+    val rollingConfidence: Double? = null,
+    val riskAssessment: AudioRiskAssessment? = null,
 )

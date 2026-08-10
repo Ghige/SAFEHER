@@ -32,6 +32,10 @@ TRACK_TOKEN_EXPIRY_HOURS = 24
 TRACK_TOKEN_PURPOSE = "live_track"
 
 
+def build_track_url(token: str) -> str:
+    return f"{settings.TRACK_BASE_URL}?token={token}"
+
+
 # ── Token helpers ─────────────────────────────────────────────────────────────
 
 def create_track_token(alert_id: str) -> str:
@@ -112,7 +116,7 @@ def get_track_link(
 
     token = create_track_token(str(alert_id))
     return {
-        "track_url": f"https://safeher.app/track?token={token}",
+        "track_url": build_track_url(token),
         "expires_in_hours": TRACK_TOKEN_EXPIRY_HOURS
     }
 

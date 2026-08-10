@@ -65,3 +65,17 @@ data class AiSosResponseDto(
 )
 
 typealias AiResponseDto = AiConfidenceResponseDto
+
+@JsonClass(generateAdapter = true)
+data class AiModelVersionDto(
+    val model_type: String,
+    val version: String,
+    val status: String,
+    val artifact_path: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AiDatasetQueueResponseDto(
+    val sample_id: String,
+    val status: String,
+)

@@ -4,8 +4,14 @@ import app.cash.turbine.test
 import com.safeher.app.core.network.NetworkMonitor
 import com.safeher.app.core.session.AlertSessionManager
 import com.safeher.app.domain.model.SafetyAlert
+import com.safeher.app.data.repository.OfflineSosQueuedException
 import com.safeher.app.domain.repository.AlertRepository
 import com.safeher.app.feature.sos.util.SosLocationHelper
+import com.safeher.app.feature.sos.util.SosPreflightChecker
+import com.safeher.app.feature.sos.util.SosPreflightResult
+import com.safeher.app.services.ApplicationCoroutineScope
+import com.safeher.app.services.BatteryOptimizationManager
+import com.safeher.app.services.LocationPermissionManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -35,9 +41,14 @@ class SOSViewModelTest {
     private val alertSessionManager: AlertSessionManager = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor = mockk()
     private val locationHelper: SosLocationHelper = mockk()
+    private val preflightChecker: SosPreflightChecker = mockk()
+    private val locationPermissionManager: LocationPermissionManager = mockk(relaxed = true)
+    private val batteryOptimizationManager: BatteryOptimizationManager = mockk(relaxed = true)
+    private val applicationScope: ApplicationCoroutineScope = mockk(relaxed = true)
     private lateinit var viewModel: SOSViewModel
 
     private val activeAlertFlow = MutableStateFlow<SafetyAlert?>(null)
+    private val heartbeatWarningFlow = MutableStateFlow(false)
     private val testDispatcher = StandardTestDispatcher()
 
     private val sampleAlert = SafetyAlert(
@@ -56,8 +67,16 @@ class SOSViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { networkMonitor.isOnline } returns flowOf(true)
         every { alertSessionManager.activeAlert } returns activeAlertFlow
+        every { alertSessionManager.heartbeatWarning } returns heartbeatWarningFlow
         coEvery { alertSessionManager.restoreActiveAlert() } returns Unit
+        coEvery { alertSessionManager.awaitRestoreAttempt() } returns Unit
         coEvery { locationHelper.getCurrentCoordinates() } returns null
+        every { preflightChecker.evaluate() } returns SosPreflightResult(
+            items = emptyList(),
+            locationAvailable = false,
+        )
+        every { alertRepository.observePendingSos() } returns flowOf(false)
+        every { applicationScope.scope } returns kotlinx.coroutines.CoroutineScope(testDispatcher)
     }
 
     @After
@@ -71,21 +90,38 @@ class SOSViewModelTest {
             alertSessionManager,
             networkMonitor,
             locationHelper,
+            preflightChecker,
+            locationPermissionManager,
+            batteryOptimizationManager,
+            applicationScope,
         )
     }
 
     @Test
-    fun restoreActiveAlert_withOngoingAlert_emitsNavigateToActive() = runTest(testDispatcher) {
-        activeAlertFlow.value = sampleAlert
+    fun observeSession_whenAlertBecomesOngoing_emitsNavigateToActive() = runTest(testDispatcher) {
         createViewModel()
+        testScheduler.runCurrent()
 
         viewModel.events.test {
-            viewModel.restoreActiveAlert()
+            activeAlertFlow.value = sampleAlert
             testScheduler.advanceUntilIdle()
             assertEquals(SOSEvent.NavigateToActive, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
-        verify { alertSessionManager.startHeartbeat("alert-uuid-123", any()) }
+    }
+
+    @Test
+    fun syncActiveAlertUi_withOngoingAlert_emitsNavigateToActive() = runTest(testDispatcher) {
+        activeAlertFlow.value = sampleAlert
+        createViewModel()
+
+        viewModel.events.test {
+            viewModel.syncActiveAlertUi()
+            testScheduler.advanceUntilIdle()
+            assertEquals(SOSEvent.NavigateToActive, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { alertSessionManager.restoreActiveAlert() }
     }
 
     @Test

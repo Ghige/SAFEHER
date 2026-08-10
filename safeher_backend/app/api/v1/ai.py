@@ -3,7 +3,7 @@ AI model endpoints — receive SOS events from the on-device AI models
 and run sensor fusion before deciding whether to fire an alert.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional
@@ -15,6 +15,11 @@ from app.services.ai_alert_service import (
     handle_audio_sos,
     handle_movement_sos,
     compute_fused_confidence,
+)
+from app.services.ai_dataset_service import (
+    get_latest_model_version,
+    queue_dataset_sample,
+    parse_features_json,
 )
 from app.services.redis_service import check_rate_limit
 from app.config import settings
@@ -134,3 +139,71 @@ def confidence_score(
         is_night=payload.is_night,
         is_isolated=payload.is_isolated,
     )
+
+
+class ModelVersionResponse(BaseModel):
+    model_type: str
+    version: str
+    status: str
+    artifact_path: Optional[str] = None
+
+
+class DatasetQueueResponse(BaseModel):
+    sample_id: str
+    status: str
+
+
+@router.get("/models/latest", response_model=ModelVersionResponse)
+def latest_model_version(
+    model_type: str = "audio",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the active production model version for on-device clients."""
+    record = get_latest_model_version(db, model_type=model_type)
+    if not record:
+        raise HTTPException(status_code=404, detail="No active model version found")
+    return ModelVersionResponse(
+        model_type=record.model_type,
+        version=record.version,
+        status=record.status,
+        artifact_path=record.artifact_path,
+    )
+
+
+@router.post("/datasets/queue", response_model=DatasetQueueResponse)
+async def queue_ai_dataset_sample(
+    audio: UploadFile = File(...),
+    model_version: str = Form(...),
+    ai_confidence: Optional[float] = Form(None),
+    user_confirmation: Optional[bool] = Form(None),
+    label: Optional[str] = Form(None),
+    duration_seconds: Optional[float] = Form(None),
+    features_json: Optional[str] = Form(None),
+    device_info_json: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Queue an audio clip for future retraining. Requires user opt-in on device.
+    Infrastructure only — no on-server retraining.
+    """
+    if not audio.content_type or "audio" not in audio.content_type:
+        raise HTTPException(status_code=400, detail="Upload must be an audio file")
+    audio_bytes = await audio.read()
+    if len(audio_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Empty audio upload")
+
+    sample = queue_dataset_sample(
+        db=db,
+        user_id=current_user.id,
+        audio_bytes=audio_bytes,
+        model_version=model_version,
+        ai_confidence=ai_confidence,
+        user_confirmation=user_confirmation,
+        label=label,
+        duration_seconds=duration_seconds,
+        features=parse_features_json(features_json),
+        device_info=parse_features_json(device_info_json),
+    )
+    return DatasetQueueResponse(sample_id=str(sample.id), status=sample.status)

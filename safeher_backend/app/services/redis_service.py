@@ -17,13 +17,14 @@ logger = logging.getLogger(__name__)
 
 _redis_client = None
 _redis_available = None   # None = not yet tested
+_redis_warned = False
 
 # ── In-memory fallback (dev / Redis unavailable) ──────────────────────────────
 _memory_store: dict = {}
 
 
 def _get_client():
-    global _redis_client, _redis_available
+    global _redis_client, _redis_available, _redis_warned
     if _redis_available is False:
         return None
     if _redis_client is not None:
@@ -39,8 +40,19 @@ def _get_client():
         return _redis_client
     except Exception as e:
         _redis_available = False
-        logger.warning(f"Redis unavailable ({e}). Using in-memory fallback — NOT suitable for production.")
+        if not _redis_warned:
+            logger.warning(
+                "Redis unavailable (%s). Using in-memory fallback — "
+                "NOT suitable for production multi-worker deployments.",
+                e,
+            )
+            _redis_warned = True
         return None
+
+
+def is_redis_available() -> bool:
+    """Return True when Redis is connected (required for reliable dead-man switch)."""
+    return _get_client() is not None
 
 
 # ── Dead man's switch pings ───────────────────────────────────────────────────
@@ -49,18 +61,19 @@ PING_KEY_PREFIX = "safeher:ping:"
 PING_TTL_SECONDS = 600   # 10 min — auto-expire so Redis doesn't accumulate stale keys
 
 
-def record_ping(alert_id: str) -> None:
+def record_ping(alert_id: str, timestamp: float | None = None) -> None:
     """Record a heartbeat for the given alert. Called every 60s by the app."""
     key = PING_KEY_PREFIX + alert_id
+    ts = timestamp if timestamp is not None else time.time()
     client = _get_client()
     if client:
         try:
-            client.set(key, str(time.time()), ex=PING_TTL_SECONDS)
+            client.set(key, str(ts), ex=PING_TTL_SECONDS)
             return
         except Exception as e:
             logger.error(f"Redis ping write failed: {e}")
     # Fallback
-    _memory_store[key] = time.time()
+    _memory_store[key] = ts
 
 
 def get_last_ping(alert_id: str) -> Optional[float]:

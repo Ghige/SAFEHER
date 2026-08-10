@@ -16,6 +16,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_verified     = Column(Boolean, default=False, nullable=False)   # phone OTP verified
     drive_token     = Column(Text, nullable=True)                      # Fernet-encrypted OAuth token
+    fcm_token       = Column(String(512), nullable=True)               # Firebase Cloud Messaging device token
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     last_active     = Column(DateTime(timezone=True), onupdate=func.now())
 

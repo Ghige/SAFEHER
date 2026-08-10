@@ -1,8 +1,8 @@
 package com.safeher.app.data.repository
 
 import com.safeher.app.core.network.AiApi
-import com.safeher.app.core.network.ApiErrorParser
 import com.safeher.app.core.network.NetworkMonitor
+import com.safeher.app.core.network.RepositoryApiCall
 import com.safeher.app.data.remote.dto.AiConfidenceResponseDto
 import com.safeher.app.data.remote.dto.AiFusionDto
 import com.safeher.app.data.remote.dto.AiSosResponseDto
@@ -15,7 +15,10 @@ import com.safeher.app.domain.model.AiSosResult
 import com.safeher.app.domain.repository.AiRepository
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.flow.first
-import retrofit2.HttpException
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,7 +35,7 @@ class AiRepositoryImpl @Inject constructor(
         heartRateSpike: Boolean,
         isNight: Boolean?,
         isIsolated: Boolean,
-    ): Result<AiConfidenceResult> = apiCall {
+    ): Result<AiConfidenceResult> = RepositoryApiCall.executeOnline(moshi, networkMonitor) {
         api.getConfidence(
             ConfidenceRequestDto(
                 audio_score = audioScore,
@@ -51,7 +54,7 @@ class AiRepositoryImpl @Inject constructor(
         longitude: Float?,
         isNight: Boolean?,
         isIsolated: Boolean,
-    ): Result<AiSosResult> = apiCall {
+    ): Result<AiSosResult> = RepositoryApiCall.executeOnline(moshi, networkMonitor) {
         api.triggerAudioSos(
             AudioSosRequestDto(
                 audio_score = audioScore,
@@ -72,7 +75,7 @@ class AiRepositoryImpl @Inject constructor(
         longitude: Float?,
         isNight: Boolean?,
         isIsolated: Boolean,
-    ): Result<AiSosResult> = apiCall {
+    ): Result<AiSosResult> = RepositoryApiCall.executeOnline(moshi, networkMonitor) {
         api.triggerMovementSos(
             MovementSosRequestDto(
                 movement_score = movementScore,
@@ -86,18 +89,44 @@ class AiRepositoryImpl @Inject constructor(
         ).toDomain()
     }
 
-    private suspend inline fun <T> apiCall(block: () -> T): Result<T> {
-        return try {
-            if (!networkMonitor.isOnline.first()) {
-                Result.failure(Exception("You are offline. Connect to the internet and try again."))
-            } else {
-                Result.success(block())
-            }
-        } catch (e: HttpException) {
-            Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
-        } catch (e: Exception) {
-            Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
+    override suspend fun getLatestModelVersion(modelType: String): Result<String> =
+        RepositoryApiCall.executeOnline(moshi, networkMonitor) {
+            api.getLatestModelVersion(modelType).version
         }
+
+    override suspend fun queueDatasetSample(
+        audioWav: ByteArray,
+        modelVersion: String,
+        aiConfidence: Float,
+        userConfirmation: Boolean,
+        label: String,
+        durationSeconds: Float,
+        featuresJson: String,
+    ): Result<Unit> = try {
+        if (!networkMonitor.isOnline.first()) {
+            Result.failure(Exception("Offline — dataset upload skipped"))
+        } else {
+            val textType = "text/plain".toMediaType()
+            val audioPart = MultipartBody.Part.createFormData(
+                "audio",
+                "clip.wav",
+                audioWav.toRequestBody("audio/wav".toMediaType()),
+            )
+            api.queueDatasetSample(
+                audio = audioPart,
+                modelVersion = modelVersion.toRequestBody(textType),
+                aiConfidence = aiConfidence.toString().toRequestBody(textType),
+                userConfirmation = userConfirmation.toString().toRequestBody(textType),
+                label = label.toRequestBody(textType),
+                durationSeconds = durationSeconds.toString().toRequestBody(textType),
+                featuresJson = featuresJson.toRequestBody(textType),
+            )
+            Timber.i("AI dataset sample queued label=%s model=%s", label, modelVersion)
+            Result.success(Unit)
+        }
+    } catch (e: Exception) {
+        Timber.w(e, "AI dataset upload failed")
+        Result.failure(e)
     }
 
     private fun AiConfidenceResponseDto.toDomain() = AiConfidenceResult(

@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.contact import EmergencyContact
-from app.schemas.user_schema import UserProfile, ContactCreate, ContactResponse
+from app.schemas.user_schema import UserProfile, ContactCreate, ContactResponse, DeviceTokenUpdate
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -65,4 +65,15 @@ def delete_contact(
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
     db.delete(contact)
+    db.commit()
+
+
+@router.post("/device-token", status_code=204)
+def register_device_token(
+    payload: DeviceTokenUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Register or update the user's FCM device token for push notifications."""
+    current_user.fcm_token = payload.fcm_token.strip()
     db.commit()

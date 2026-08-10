@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="safeher_primary">#FF6B4CE6</color>
+    <color name="safeher_primary">#FFFF689D</color>
     <color name="safeher_on_primary">#FFFFFFFF</color>
-    <color name="safeher_secondary">#FF625B71</color>
-    <color name="safeher_background">#FFFFFBFE</color>
-    <color name="safeher_surface">#FFFFFBFE</color>
-    <color name="safeher_error">#FFB3261E</color>
+    <color name="safeher_secondary">#FFFFC1D6</color>
+    <color name="safeher_background">#FFFFF5F7</color>
+    <color name="safeher_surface">#FFFFFFFF</color>
+    <color name="safeher_error">#FFE8456A</color>
 </resources>

@@ -31,4 +31,16 @@ interface AiRepository {
         isNight: Boolean? = null,
         isIsolated: Boolean = false,
     ): Result<AiSosResult>
+
+    suspend fun getLatestModelVersion(modelType: String = "audio"): Result<String>
+
+    suspend fun queueDatasetSample(
+        audioWav: ByteArray,
+        modelVersion: String,
+        aiConfidence: Float,
+        userConfirmation: Boolean,
+        label: String,
+        durationSeconds: Float,
+        featuresJson: String,
+    ): Result<Unit>
 }

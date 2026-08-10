@@ -3,6 +3,7 @@ package com.safeher.app.feature.ai
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,41 +11,50 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.safeher.app.R
+import com.safeher.app.core.designsystem.SafeHerIcons
+import com.safeher.app.core.designsystem.SafeHerLightPink
+import com.safeher.app.core.designsystem.SafeHerPrimary
+import com.safeher.app.core.designsystem.SafeHerTextSecondary
+import com.safeher.app.core.designsystem.components.PinkWaveform
+import com.safeher.app.core.designsystem.components.SafeHerCard
+import com.safeher.app.core.designsystem.components.SafeHerStatusBadge
+import com.safeher.app.feature.ai.components.AiConfidenceGauge
+import com.safeher.app.feature.ai.components.AiEmergencyConfirmationCard
+import com.safeher.app.feature.ai.components.AiMetricTile
 import com.safeher.app.feature.ai.components.AiToggleCard
-import com.safeher.app.feature.ai.components.AudioLevelIndicator
-import com.safeher.app.feature.ai.components.ConfidenceCard
-import com.safeher.app.feature.ai.components.ListeningAnimation
 import com.safeher.app.feature.ai.components.LoadingAi
-import com.safeher.app.feature.ai.components.MovementIndicator
 import com.safeher.app.feature.home.components.ErrorType
 import com.safeher.app.feature.home.components.ErrorView
 import com.safeher.app.feature.home.components.OfflineBanner
+import com.safeher.app.feature.home.components.SafeHerScreenHeader
+import com.safeher.app.services.ai.AiFeatureFlags
 import com.safeher.app.services.AudioPermissionStatus
 import kotlinx.coroutines.flow.collectLatest
 
@@ -59,8 +69,6 @@ fun AiMonitoringScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val lifecycleOwner = LocalLifecycleOwner.current
-
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -71,18 +79,6 @@ fun AiMonitoringScreen(
         if (granted) {
             viewModel.onToggleMonitoring(true)
         }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> viewModel.setAppInForeground(true)
-                Lifecycle.Event.ON_STOP -> viewModel.setAppInForeground(false)
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(Unit) {
@@ -108,6 +104,7 @@ fun AiMonitoringScreen(
     Scaffold(
         modifier = Modifier.padding(contentPadding),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -115,6 +112,13 @@ fun AiMonitoringScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SafeHerScreenHeader(
+                title = stringResource(R.string.ai_monitor_title),
+                actionIcon = SafeHerIcons.Settings,
+                onActionClick = onNavigateToSettings,
+                actionContentDescription = stringResource(R.string.ai_settings),
+            )
+
             if (uiState.isOffline) {
                 Surface(color = MaterialTheme.colorScheme.errorContainer) {
                     OfflineBanner()
@@ -128,8 +132,58 @@ fun AiMonitoringScreen(
 
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                SafeHerCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(SafeHerLightPink),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = SafeHerIcons.Microphone,
+                                contentDescription = null,
+                                tint = SafeHerPrimary,
+                                modifier = Modifier.size(30.dp),
+                            )
+                        }
+                        Text(
+                            text = if (uiState.isMonitoring) {
+                                stringResource(R.string.ai_listening_title)
+                            } else {
+                                stringResource(R.string.ai_not_listening_title)
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(R.string.home_ai_voice_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SafeHerTextSecondary,
+                        )
+                        SafeHerStatusBadge(
+                            text = if (uiState.isMonitoring) {
+                                stringResource(R.string.status_active)
+                            } else {
+                                stringResource(R.string.status_inactive)
+                            },
+                            isActive = uiState.isMonitoring,
+                        )
+                        PinkWaveform(
+                            isActive = uiState.isMonitoring,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                        )
+                    }
+                }
+
                 AiToggleCard(
                     enabled = uiState.monitoringEnabled,
                     isMonitoring = uiState.isMonitoring,
@@ -155,28 +209,55 @@ fun AiMonitoringScreen(
                             text = stringResource(R.string.ai_models_missing),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
                     }
                 }
 
-                Box(contentAlignment = Alignment.Center) {
-                    ListeningAnimation(isListening = uiState.isMonitoring)
-                    AudioLevelIndicator(
-                        level = uiState.audioLevel,
-                        isActive = uiState.isMonitoring,
+                val confidenceValue = uiState.rollingConfidence
+                    ?: uiState.confidence?.totalScore
+                AiConfidenceGauge(
+                    confidencePercent = confidenceValue,
+                    riskLabel = uiState.riskLevelLabel,
+                    isLoading = uiState.isLoadingConfidence,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    AiMetricTile(
+                        label = stringResource(R.string.ai_metric_volume),
+                        value = volumeLabel(uiState),
+                        modifier = Modifier.weight(1f),
+                    )
+                    AiMetricTile(
+                        label = stringResource(R.string.ai_metric_frequency),
+                        value = frequencyLabel(uiState),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    AiMetricTile(
+                        label = stringResource(R.string.ai_metric_duration),
+                        value = durationLabel(uiState),
+                        modifier = Modifier.weight(1f),
+                    )
+                    AiMetricTile(
+                        label = stringResource(R.string.ai_metric_risk),
+                        value = uiState.riskLevelLabel ?: stringResource(R.string.ai_unavailable),
+                        modifier = Modifier.weight(1f),
                     )
                 }
 
-                MovementIndicator(
-                    level = uiState.movementLevel,
-                    isActive = uiState.isMonitoring,
-                )
-
-                ConfidenceCard(
-                    confidence = uiState.confidence,
-                    isLoading = uiState.isLoadingConfidence,
-                )
+                if (uiState.pendingEmergencyConfirmation) {
+                    AiEmergencyConfirmationCard(
+                        onConfirmSafe = { viewModel.onEmergencyConfirmation(false) },
+                        onConfirmSos = { viewModel.onEmergencyConfirmation(true) },
+                    )
+                }
 
                 if (uiState.error != null && uiState.confidence == null) {
                     ErrorView(
@@ -184,33 +265,59 @@ fun AiMonitoringScreen(
                         errorType = ErrorType.GENERIC,
                         onRetry = viewModel::retry,
                     )
-                } else if (uiState.error != null) {
-                    Text(
-                        text = uiState.error.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(
-                        onClick = onNavigateToStatus,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.ai_view_status))
-                    }
-                    OutlinedButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.ai_settings))
-                    }
+                if (AiFeatureFlags.MOVEMENT_AI_ENABLED.not()) {
+                    Text(
+                        text = stringResource(R.string.ai_movement_coming_soon),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SafeHerTextSecondary,
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun volumeLabel(uiState: AiMonitoringUiState): String {
+    val assessment = uiState.riskAssessment
+    if (assessment != null) {
+        return if (assessment.volumeSpike) {
+            stringResource(R.string.ai_level_high)
+        } else {
+            stringResource(R.string.ai_level_normal)
+        }
+    }
+    return if (uiState.audioLevel > 0.6f) {
+        stringResource(R.string.ai_level_high)
+    } else if (uiState.audioLevel > 0.2f) {
+        stringResource(R.string.ai_level_normal)
+    } else {
+        stringResource(R.string.ai_unavailable)
+    }
+}
+
+@Composable
+private fun frequencyLabel(uiState: AiMonitoringUiState): String {
+    val assessment = uiState.riskAssessment
+    if (assessment != null) {
+        return if (assessment.frequencyAbnormal) {
+            stringResource(R.string.ai_level_abnormal)
+        } else {
+            stringResource(R.string.ai_level_normal)
+        }
+    }
+    return stringResource(R.string.ai_unavailable)
+}
+
+@Composable
+private fun durationLabel(uiState: AiMonitoringUiState): String {
+    val seconds = uiState.riskAssessment?.durationSeconds
+    return if (seconds != null && seconds > 0) {
+        stringResource(R.string.ai_duration_seconds, seconds.toInt())
+    } else {
+        stringResource(R.string.ai_unavailable)
     }
 }
 
@@ -233,7 +340,6 @@ private fun AudioPermissionBanner(
             Text(
                 text = stringResource(R.string.ai_audio_permission_required),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
             )
             if (status == AudioPermissionStatus.PERMANENTLY_DENIED) {
                 Button(onClick = onOpenSettings) {

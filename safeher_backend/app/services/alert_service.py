@@ -6,7 +6,7 @@ import logging
 from app.models.alert import Alert
 from app.models.user import User
 from app.models.contact import EmergencyContact
-from app.services.whatsapp_service import send_whatsapp_alert, send_cancellation_message
+from app.services.meta_whatsapp_service import send_whatsapp_alert, send_cancellation_message
 from app.services.firebase_service import push_location_update, set_alert_status
 from app.services.alert_constants import ONGOING_ALERT_STATUSES
 from app.services.helper_service import find_and_notify_helpers
@@ -21,7 +21,7 @@ def trigger_alert(
     trigger_type: str,
     latitude: float = None,
     longitude: float = None
-) -> Alert:
+) -> tuple[Alert, dict]:
     """
     Core alert trigger function.
     1. Creates alert record in DB
@@ -31,13 +31,26 @@ def trigger_alert(
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
+        logger.warning(
+            "trigger_alert rejected: user_id=%s reason=user_not_found trigger_type=%s",
+            user_id,
+            trigger_type,
+        )
         raise ValueError("User not found")
 
     existing = get_active_alert(db, user_id)
     if existing:
+        logger.warning(
+            "trigger_alert rejected: user_id=%s reason=active_alert_exists "
+            "existing_alert_id=%s existing_status=%s trigger_type=%s",
+            user_id,
+            existing.id,
+            existing.status,
+            trigger_type,
+        )
         raise ValueError("An active alert already exists")
 
-    contacts = (
+    contact_count = (
         db.query(EmergencyContact)
         .filter(
             EmergencyContact.user_id == user_id,
@@ -45,7 +58,12 @@ def trigger_alert(
         )
         .count()
     )
-    if contacts == 0:
+    if contact_count == 0:
+        logger.warning(
+            "trigger_alert rejected: user_id=%s reason=no_emergency_contacts trigger_type=%s",
+            user_id,
+            trigger_type,
+        )
         raise ValueError("Add at least one emergency contact before triggering SOS")
 
     # Create alert record
@@ -76,16 +94,27 @@ def trigger_alert(
     )
 
     # Send WhatsApp to all contacts
+    sent_count = 0
+    failed_count = 0
     for contact in contacts:
-        send_whatsapp_alert(
+        if send_whatsapp_alert(
             to_phone=contact.phone_number,
             user_name=user.name,
-            latitude=latitude or 0.0,
-            longitude=longitude or 0.0,
+            latitude=latitude,
+            longitude=longitude,
             alert_id=str(alert.id),
             trigger_type=trigger_type,
-            track_token=track_token
-        )
+            track_token=track_token,
+        ):
+            sent_count += 1
+        else:
+            failed_count += 1
+
+    notification_status = {
+        "whatsapp_sent_count": sent_count,
+        "whatsapp_failed_count": failed_count,
+        "whatsapp_all_delivered": failed_count == 0 and sent_count > 0,
+    }
 
     # Push to Firebase for live tracking
     if latitude and longitude:
@@ -106,8 +135,11 @@ def trigger_alert(
             longitude=longitude
         )
 
-    logger.info(f"Alert {alert.id} triggered for user {user_id} via {trigger_type}")
-    return alert
+    logger.info(
+        f"Alert {alert.id} triggered for user {user_id} via {trigger_type} "
+        f"(whatsapp sent={sent_count}, failed={failed_count})"
+    )
+    return alert, notification_status
 
 
 def cancel_alert(db: Session, alert_id: UUID, user_id: UUID) -> Alert:

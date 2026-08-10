@@ -3,8 +3,12 @@ package com.safeher.app.services
 import android.content.Context
 import android.content.Intent
 import androidx.hilt.work.HiltWorker
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -12,6 +16,7 @@ import com.safeher.app.core.session.AlertSessionManager
 import com.safeher.app.domain.repository.LocationRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import java.util.concurrent.TimeUnit
 
 @HiltWorker
 class LocationWorker @AssistedInject constructor(
@@ -57,10 +62,19 @@ class LocationWorker @AssistedInject constructor(
                 .putDouble(KEY_LATITUDE, latitude)
                 .putDouble(KEY_LONGITUDE, longitude)
                 .build()
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
             val request = OneTimeWorkRequestBuilder<LocationWorker>()
                 .setInputData(data)
+                .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context).enqueue(request)
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
         }
     }
 }

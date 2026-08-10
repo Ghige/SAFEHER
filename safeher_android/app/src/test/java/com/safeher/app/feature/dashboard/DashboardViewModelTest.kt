@@ -1,8 +1,12 @@
 package com.safeher.app.feature.dashboard
 
 import app.cash.turbine.test
+import com.safeher.app.core.datastore.SettingsStore
 import com.safeher.app.domain.model.UserProfile
+import com.safeher.app.domain.repository.ContactsRepository
 import com.safeher.app.domain.repository.UserRepository
+import com.safeher.app.services.AiMonitoringCoordinator
+import com.safeher.app.services.LocationTrackingService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -28,6 +32,10 @@ import org.junit.Test
 class DashboardViewModelTest {
 
     private val userRepository: UserRepository = mockk()
+    private val contactsRepository: ContactsRepository = mockk(relaxed = true)
+    private val settingsStore: SettingsStore = mockk(relaxed = true)
+    private val aiMonitoringCoordinator: AiMonitoringCoordinator = mockk(relaxed = true)
+    private val locationTrackingService: LocationTrackingService = mockk(relaxed = true)
     private lateinit var viewModel: DashboardViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -43,6 +51,11 @@ class DashboardViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         every { userRepository.observeNetworkStatus() } returns flowOf(true)
+        every { settingsStore.aiAudioDetectionEnabled } returns flowOf(true)
+        every { aiMonitoringCoordinator.isMonitoring } returns flowOf(false)
+        every { aiMonitoringCoordinator.riskAssessment } returns flowOf(null)
+        every { locationTrackingService.isTracking } returns flowOf(false)
+        coEvery { contactsRepository.getContacts() } returns Result.success(emptyList())
     }
 
     @After
@@ -50,10 +63,18 @@ class DashboardViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private fun createViewModel() = DashboardViewModel(
+        userRepository = userRepository,
+        contactsRepository = contactsRepository,
+        settingsStore = settingsStore,
+        aiMonitoringCoordinator = aiMonitoringCoordinator,
+        locationTrackingService = locationTrackingService,
+    )
+
     @Test
     fun loadProfile_success_updatesUiState() = runTest {
         coEvery { userRepository.getProfile() } returns Result.success(sampleProfile)
-        viewModel = DashboardViewModel(userRepository)
+        viewModel = createViewModel()
 
         assertFalse(viewModel.uiState.value.isLoading)
         assertEquals(sampleProfile, viewModel.uiState.value.profile)
@@ -63,7 +84,7 @@ class DashboardViewModelTest {
     @Test
     fun loadProfile_failure_setsError() = runTest {
         coEvery { userRepository.getProfile() } returns Result.failure(Exception("Network error"))
-        viewModel = DashboardViewModel(userRepository)
+        viewModel = createViewModel()
 
         assertFalse(viewModel.uiState.value.isLoading)
         assertEquals("Network error", viewModel.uiState.value.error)
@@ -74,7 +95,7 @@ class DashboardViewModelTest {
     fun loadProfile_retry_callsRepositoryAgain() = runTest {
         coEvery { userRepository.getProfile() } returns Result.failure(Exception("Network error")) andThen
             Result.success(sampleProfile)
-        viewModel = DashboardViewModel(userRepository)
+        viewModel = createViewModel()
 
         viewModel.loadProfile()
 
@@ -85,7 +106,7 @@ class DashboardViewModelTest {
     @Test
     fun onQuickAction_emitsNavigationEvent() = runTest {
         coEvery { userRepository.getProfile() } returns Result.success(sampleProfile)
-        viewModel = DashboardViewModel(userRepository)
+        viewModel = createViewModel()
 
         viewModel.events.test {
             viewModel.onQuickAction(QuickActionFeature.SOS)
@@ -98,7 +119,7 @@ class DashboardViewModelTest {
         val onlineFlow = MutableStateFlow(true)
         every { userRepository.observeNetworkStatus() } returns onlineFlow
         coEvery { userRepository.getProfile() } returns Result.success(sampleProfile)
-        viewModel = DashboardViewModel(userRepository)
+        viewModel = createViewModel()
 
         assertFalse(viewModel.uiState.value.isOffline)
 

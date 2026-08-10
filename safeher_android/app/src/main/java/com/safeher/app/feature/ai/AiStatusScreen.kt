@@ -24,6 +24,8 @@ import com.safeher.app.feature.ai.components.MovementIndicator
 import com.safeher.app.feature.ai.components.AudioLevelIndicator
 import com.safeher.app.feature.home.components.OfflineBanner
 import com.safeher.app.domain.model.AiAction
+import com.safeher.app.services.ai.AiFeatureFlags
+import com.safeher.app.services.ai.AiScoreThresholds
 
 @Composable
 fun AiStatusScreen(
@@ -78,16 +80,57 @@ fun AiStatusScreen(
                 },
             )
 
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.ai_status_thresholds_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.ai_status_thresholds_body,
+                            AiScoreThresholds.SENSOR_NOISE_FLOOR,
+                            AiScoreThresholds.TIER_CONFIRM_30S,
+                            AiScoreThresholds.TIER_IMMEDIATE_SOS,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             AudioLevelIndicator(
                 level = uiState.audioLevel,
                 isActive = uiState.isMonitoring,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
 
-            MovementIndicator(
-                level = uiState.movementLevel,
-                isActive = uiState.isMonitoring,
-            )
+            if (AiFeatureFlags.MOVEMENT_AI_ENABLED) {
+                MovementIndicator(
+                    level = uiState.movementLevel,
+                    isActive = uiState.isMonitoring,
+                )
+            } else {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text(
+                        text = stringResource(R.string.ai_movement_coming_soon),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             ConfidenceCard(
                 confidence = uiState.confidence,

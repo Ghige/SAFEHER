@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.safeher.app.MainActivity
@@ -19,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -43,13 +46,28 @@ class LocationForegroundService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START -> {
-                val id = intent.getStringExtra(EXTRA_ALERT_ID)
-                if (id.isNullOrBlank()) {
+                if (!permissionManager.hasLocationPermission()) {
+                    Timber.w("Location permission missing — aborting location FGS start")
+                    locationTrackingService.onServiceStopped()
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                // Must enter foreground immediately — Android kills the process if
+                // startForegroundService() is not followed by startForeground() in time.
+                try {
+                    startForegroundWithLocationType()
+                } catch (e: SecurityException) {
+                    Timber.e(e, "Location FGS blocked — permission not granted")
+                    locationTrackingService.onServiceStopped()
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                val id = intent.getStringExtra(EXTRA_ALERT_ID)
+                if (id.isNullOrBlank()) {
+                    stopTrackingInternal()
+                    return START_NOT_STICKY
+                }
                 alertId = id
-                startForeground(NOTIFICATION_ID, buildNotification())
                 startTrackingLoop(id)
             }
         }
@@ -110,6 +128,19 @@ class LocationForegroundService : Service() {
         locationTrackingService.onServiceStopped()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun startForegroundWithLocationType() {
+        val notification = buildNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildNotification(): Notification {

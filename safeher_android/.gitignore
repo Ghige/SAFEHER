@@ -16,4 +16,5 @@ captures/
 .DS_Store
 *.keystore
 !debug.keystore
+keystore.properties
 google-services.json

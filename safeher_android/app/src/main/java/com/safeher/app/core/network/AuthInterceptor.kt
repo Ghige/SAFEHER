@@ -1,7 +1,6 @@
 package com.safeher.app.core.network
 
 import com.safeher.app.core.datastore.SecureTokenStore
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
 import javax.inject.Inject
@@ -16,7 +15,7 @@ class AuthInterceptor @Inject constructor(
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = runBlocking { secureTokenStore.getAccessToken() }
+        val token = secureTokenStore.getAccessTokenSync()
         val request = if (!token.isNullOrBlank()) {
             chain.request().newBuilder()
                 .header("Authorization", "Bearer $token")

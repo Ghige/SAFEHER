@@ -72,6 +72,8 @@ def test_trigger_cancel_active_history_flow():
     alert_id = trigger.json()["id"]
     assert trigger.json()["status"] == "active"
     assert trigger.json()["latitude"] == pytest.approx(19.076)
+    assert "whatsapp_sent_count" in trigger.json()
+    assert "whatsapp_all_delivered" in trigger.json()
 
     active = client.get("/api/v1/alerts/active", headers=headers)
     assert active.status_code == 200
@@ -106,5 +108,15 @@ def test_invalid_trigger_type_rejected():
         "/api/v1/alerts/trigger",
         headers=headers,
         json={"trigger_type": "invalid_type", "latitude": 19.0, "longitude": 72.0},
+    )
+    assert resp.status_code == 422
+
+
+def test_add_contact_invalid_phone_rejected():
+    _, headers = _register_and_verify()
+    resp = client.post(
+        "/api/v1/users/contacts",
+        headers=headers,
+        json={"name": "Mom", "phone_number": "not-a-phone", "relationship": "Mother", "ring_priority": 1},
     )
     assert resp.status_code == 422

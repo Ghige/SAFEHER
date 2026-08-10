@@ -16,7 +16,6 @@ object Route {
     const val SOS_HISTORY = "sos/history"
     const val LOCATION = "location"
     const val LOCATION_PERMISSION = "location/permission"
-    const val LOCATION_SETTINGS = "location/settings"
     const val LOCATION_TRACK = "location/track"
     const val HELPERS = "helpers"
     const val HELPER_PROFILE = "helpers/profile/{helper_id}"
@@ -24,6 +23,14 @@ object Route {
     const val AI = "ai"
     const val AI_STATUS = "ai/status"
     const val AI_SETTINGS = "ai/settings"
+    const val SETTINGS = "settings"
+    const val SETTINGS_PERMISSIONS = "settings/permissions"
+    const val SETTINGS_NOTIFICATIONS = "settings/notifications"
+    const val SETTINGS_SECURITY = "settings/security"
+    const val SETTINGS_ABOUT = "settings/about"
+    const val SETTINGS_PRIVACY = "settings/privacy"
+    const val SETTINGS_TERMS = "settings/terms"
+    const val SETTINGS_BATTERY = "settings/battery"
     const val COMING_SOON = "coming_soon/{feature}"
 
     /** @deprecated Use [HOME] */

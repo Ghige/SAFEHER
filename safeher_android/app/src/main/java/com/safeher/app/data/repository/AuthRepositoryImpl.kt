@@ -2,7 +2,7 @@ package com.safeher.app.data.repository
 
 import com.safeher.app.core.datastore.SecureTokenStore
 import com.safeher.app.core.datastore.UserPreferences
-import com.safeher.app.core.network.ApiErrorParser
+import com.safeher.app.core.network.RepositoryApiCall
 import com.safeher.app.core.network.SafeHerApi
 import com.safeher.app.core.session.AuthSessionManager
 import com.safeher.app.data.remote.dto.LoginRequestDto
@@ -32,7 +32,7 @@ class AuthRepositoryImpl @Inject constructor(
         name: String,
         password: String,
         city: String?,
-    ): Result<Unit> = apiCall {
+    ): Result<Unit> = RepositoryApiCall.execute(moshi) {
         val response = api.register(
             RegisterRequestDto(
                 phone_number = phoneNumber.trim(),
@@ -46,7 +46,7 @@ class AuthRepositoryImpl @Inject constructor(
         userPreferences.setPhoneVerified(false)
     }
 
-    override suspend fun login(phoneNumber: String, password: String): Result<Unit> = apiCall {
+    override suspend fun login(phoneNumber: String, password: String): Result<Unit> = RepositoryApiCall.execute(moshi) {
         val response = api.login(
             LoginRequestDto(
                 phone_number = phoneNumber.trim(),
@@ -57,11 +57,11 @@ class AuthRepositoryImpl @Inject constructor(
         userPreferences.setUserPhone(phoneNumber.trim())
     }
 
-    override suspend fun sendOtp(phoneNumber: String): Result<String> = apiCall {
+    override suspend fun sendOtp(phoneNumber: String): Result<String> = RepositoryApiCall.execute(moshi) {
         api.sendOtp(SendOtpRequestDto(phone_number = phoneNumber.trim())).message
     }
 
-    override suspend fun verifyOtp(phoneNumber: String, otp: String): Result<String> = apiCall {
+    override suspend fun verifyOtp(phoneNumber: String, otp: String): Result<String> = RepositoryApiCall.execute(moshi) {
         val message = api.verifyOtp(
             OtpVerifyRequestDto(
                 phone_number = phoneNumber.trim(),
@@ -85,11 +85,5 @@ class AuthRepositoryImpl @Inject constructor(
 
     override fun clearSessionExpiredFlag() {
         authSessionManager.clearSessionExpiredFlag()
-    }
-
-    private suspend inline fun <T> apiCall(block: () -> T): Result<T> = try {
-        Result.success(block())
-    } catch (e: Exception) {
-        Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
     }
 }

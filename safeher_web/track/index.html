@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeHer — Live Location</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --text: #f5f7fa;
+      --muted: #94a3b8;
+      --accent: #e11d48;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    header h1 { font-size: 1.125rem; font-weight: 600; }
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.625rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-active { background: rgba(225, 29, 72, 0.2); color: #fda4af; }
+    .badge-escalated { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .badge-cancelled { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+    .badge-loading { background: #334155; color: var(--muted); }
+    main { padding: 1rem; max-width: 720px; margin: 0 auto; }
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid #2d3748;
+    }
+    .card p { color: var(--muted); line-height: 1.5; font-size: 0.9375rem; }
+    .card strong { color: var(--text); }
+    #map-frame {
+      width: 100%;
+      height: 320px;
+      border: 0;
+      border-radius: 12px;
+      background: #111827;
+    }
+    .coords {
+      font-family: ui-monospace, monospace;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+    }
+    .error {
+      color: #fca5a5;
+      padding: 1rem;
+      background: rgba(225, 29, 72, 0.12);
+      border-radius: 8px;
+      border: 1px solid rgba(225, 29, 72, 0.3);
+    }
+    .footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      padding: 1.5rem 1rem;
+    }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SafeHer Live Track</h1>
+    <span id="status-badge" class="badge badge-loading">Loading</span>
+  </header>
+  <main>
+    <div id="message" class="card">
+      <p class="pulse">Connecting to live location…</p>
+    </div>
+    <div id="map-container" class="card" hidden>
+      <iframe id="map-frame" title="Live location map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div id="coords" class="coords"></div>
+    </div>
+    <div id="error" class="error" hidden></div>
+  </main>
+  <p class="footer">Updates every 7 seconds · SafeHer emergency tracking</p>
+
+  <script>
+    (function () {
+      const POLL_MS = 7000;
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      const apiBase = window.SAFEHER_API_BASE || "https://api.safeher.app";
+
+      const badge = document.getElementById("status-badge");
+      const message = document.getElementById("message");
+      const mapContainer = document.getElementById("map-container");
+      const mapFrame = document.getElementById("map-frame");
+      const coordsEl = document.getElementById("coords");
+      const errorEl = document.getElementById("error");
+
+      function setBadge(status) {
+        badge.className = "badge badge-" + (status === "active" ? "active" : status === "escalated" ? "escalated" : status === "cancelled" ? "cancelled" : "loading");
+        badge.textContent = status === "active" ? "Active alert" : status === "escalated" ? "Escalated" : status === "cancelled" ? "Cancelled" : status;
+      }
+
+      function showError(text) {
+        errorEl.hidden = false;
+        errorEl.textContent = text;
+        message.hidden = true;
+        mapContainer.hidden = true;
+        setBadge("error");
+      }
+
+      if (!token) {
+        showError("Missing tracking token. Open the link from your WhatsApp alert message.");
+        return;
+      }
+
+      async function poll() {
+        try {
+          const url = apiBase.replace(/\/$/, "") + "/api/v1/location/live?token=" + encodeURIComponent(token);
+          const res = await fetch(url);
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.detail || ("HTTP " + res.status));
+          }
+          const data = await res.json();
+          errorEl.hidden = true;
+          message.hidden = false;
+          setBadge(data.status || "unknown");
+
+          if (data.status === "cancelled") {
+            message.innerHTML = "<p><strong>Alert cancelled.</strong> They marked themselves safe. Location is no longer shared.</p>";
+            mapContainer.hidden = true;
+            return;
+          }
+
+          if (data.latitude != null && data.longitude != null) {
+            message.innerHTML = "<p><strong>Emergency alert in progress.</strong> Last updated location is shown below. Call them or go to their location.</p>";
+            mapContainer.hidden = false;
+            const lat = data.latitude;
+            const lng = data.longitude;
+            mapFrame.src = "https://maps.google.com/maps?q=" + lat + "," + lng + "&z=16&output=embed";
+            coordsEl.textContent = lat.toFixed(6) + ", " + lng.toFixed(6);
+          } else {
+            message.innerHTML = "<p><strong>Alert active.</strong> Waiting for GPS update from their phone…</p>";
+            mapContainer.hidden = true;
+          }
+        } catch (e) {
+          showError("Could not load location: " + (e.message || e));
+        }
+      }
+
+      poll();
+      setInterval(poll, POLL_MS);
+    })();
+  </script>
+</body>
+</html>

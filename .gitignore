@@ -3,77 +3,92 @@
 ##############################
 __pycache__/
 *.py[cod]
+*$py.class
 *.so
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
+*.egg-info/
+.eggs/
 venv/
 venv311/
 .venv/
 /safeher/
 
 ##############################
-# Environment
+# Environment & secrets
 ##############################
 .env
 .env.*
 !.env.example
+!.env.*.example
+firebase-credentials.json
+*firebase*adminsdk*.json
+*service-account*.json
+credentials.json
+*.pem
+*.p12
+*.jks
+*.keystore
+!debug.keystore
+keystore.properties
+secrets/
 
 ##############################
 # IDE
 ##############################
 .idea/
 .vscode/
+*.iml
 
 ##############################
-# Android
+# Android / Gradle
 ##############################
 .gradle/
 build/
-app/build/
+**/build/
 captures/
 .cxx/
 .externalNativeBuild/
 local.properties
-
-##############################
-# APK / Bundles
-##############################
 *.apk
 *.aab
+*.ap_
+*.dex
 
 ##############################
-# Firebase
-##############################
-firebase-credentials.json
-
-##############################
-# Google
+# Firebase / Google client config
 ##############################
 google-services.json
 
 ##############################
-# Keys
+# Node / Web
 ##############################
-*.keystore
-*.jks
-release.keystore
-debug.keystore
+node_modules/
+dist/
+.turbo/
+.next/
+out/
 
 ##############################
-# Logs
+# SafeHer AI — keep code & models; exclude local datasets
+##############################
+safeher_ai/data/
+
+##############################
+# Logs & temp
 ##############################
 *.log
-
-##############################
-# OS
-##############################
+tmp/
+temp/
+*.tmp
 Thumbs.db
 .DS_Store
+mic_test.wav
 
 ##############################
-# Local / temp
+# Misc local assets
 ##############################
-mic_test.wav
-*.iml
+ChatGPT Image*.png

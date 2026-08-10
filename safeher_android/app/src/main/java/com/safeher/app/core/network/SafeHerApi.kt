@@ -1,5 +1,6 @@
 package com.safeher.app.core.network
 
+import com.safeher.app.data.remote.dto.DeviceTokenRequestDto
 import com.safeher.app.data.remote.dto.LoginRequestDto
 import com.safeher.app.data.remote.dto.MessageResponseDto
 import com.safeher.app.data.remote.dto.OtpVerifyRequestDto
@@ -27,4 +28,7 @@ interface SafeHerApi {
 
     @GET("api/v1/users/profile")
     suspend fun getProfile(): UserProfileDto
+
+    @POST("api/v1/users/device-token")
+    suspend fun registerDeviceToken(@Body body: DeviceTokenRequestDto)
 }

@@ -1,5 +1,6 @@
 package com.safeher.app.core.ui.navigation
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -9,6 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.safeher.app.core.ui.NotificationPermissionEffect
 import com.safeher.app.core.ui.RootViewModel
@@ -19,6 +21,8 @@ import com.safeher.app.feature.auth.RegisterScreen
 import com.safeher.app.feature.auth.SessionExpiredScreen
 import com.safeher.app.feature.auth.SplashScreen
 import com.safeher.app.feature.dashboard.DashboardNavigation
+import timber.log.Timber
+import androidx.compose.ui.Modifier
 
 @Composable
 fun SafeHerNavGraph(
@@ -26,9 +30,15 @@ fun SafeHerNavGraph(
     rootViewModel: RootViewModel = hiltViewModel(),
 ) {
     val sessionExpired by rootViewModel.authRepository.sessionExpired.collectAsStateWithLifecycle()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+
+    LaunchedEffect(backStackEntry?.destination?.route) {
+        Timber.d("SafeHerNavGraph: destination=%s", backStackEntry?.destination?.route)
+    }
 
     LaunchedEffect(sessionExpired) {
         if (sessionExpired) {
+            Timber.w("SafeHerNavGraph: session expired — navigating to SESSION_EXPIRED")
             navController.navigate(Route.SESSION_EXPIRED) {
                 popUpTo(0) { inclusive = true }
             }
@@ -39,10 +49,12 @@ fun SafeHerNavGraph(
     NavHost(
         navController = navController,
         startDestination = Route.SPLASH,
+        modifier = Modifier.fillMaxSize(),
     ) {
         composable(Route.SPLASH) {
             SplashScreen(
                 onNavigate = { route ->
+                    Timber.d("SafeHerNavGraph: splash navigate -> %s", route)
                     navController.navigate(route) {
                         popUpTo(Route.SPLASH) { inclusive = true }
                     }
@@ -116,6 +128,7 @@ fun SafeHerNavGraph(
 }
 
 private fun navigateToHome(navController: NavHostController) {
+    Timber.d("SafeHerNavGraph: navigateToHome")
     navController.navigate(Route.HOME) {
         popUpTo(0) { inclusive = true }
     }

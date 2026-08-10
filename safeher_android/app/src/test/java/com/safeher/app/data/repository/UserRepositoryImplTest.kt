@@ -7,6 +7,7 @@ import com.safeher.app.data.remote.dto.UserProfileDto
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -73,5 +74,24 @@ class UserRepositoryImplTest {
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message?.contains("incomplete", ignoreCase = true) == true)
+    }
+
+    @Test
+    fun getProfile_usesCacheOnSecondCall() = runTest {
+        coEvery { api.getProfile() } returns UserProfileDto(
+            id = "uuid-1",
+            phone_number = "9876543210",
+            name = "Jane Doe",
+            city = "Mumbai",
+        )
+        coEvery { userPreferences.isPhoneVerified } returns flowOf(true)
+
+        val first = repository.getProfile()
+        val second = repository.getProfile()
+
+        assertTrue(first.isSuccess)
+        assertTrue(second.isSuccess)
+        assertEquals("Jane Doe", second.getOrNull()?.name)
+        coVerify(exactly = 1) { api.getProfile() }
     }
 }

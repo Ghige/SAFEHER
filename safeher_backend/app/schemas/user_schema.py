@@ -61,6 +61,18 @@ class ContactCreate(BaseModel):
     relationship: Optional[str] = None
     ring_priority: int = 1
 
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v):
+        v = v.strip().replace(" ", "").replace("-", "")
+        if not re.match(r"^\+?[0-9]{10,15}$", v):
+            raise ValueError("Invalid phone number")
+        return v
+
+
+class DeviceTokenUpdate(BaseModel):
+    fcm_token: str = Field(..., min_length=10, max_length=512)
+
 
 class ContactResponse(BaseModel):
     id: UUID

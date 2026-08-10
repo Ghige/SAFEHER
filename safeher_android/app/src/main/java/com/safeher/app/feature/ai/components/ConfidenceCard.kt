@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.safeher.app.R
 import com.safeher.app.domain.model.AiConfidenceResult
+import com.safeher.app.services.ai.AiFeatureFlags
 
 @Composable
 fun ConfidenceCard(
@@ -55,10 +56,12 @@ fun ConfidenceCard(
                         text = stringResource(R.string.ai_audio_confidence, confidence.audioScore),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Text(
-                        text = stringResource(R.string.ai_movement_confidence, confidence.movementScore),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    if (AiFeatureFlags.MOVEMENT_AI_ENABLED) {
+                        Text(
+                            text = stringResource(R.string.ai_movement_confidence, confidence.movementScore),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
                 DetectionStatusChip(action = confidence.action)
             } else {

@@ -13,13 +13,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class AlertHistoryUiState(
-    val isLoading: Boolean = true,
-    val history: List<SafetyAlert> = emptyList(),
-    val error: String? = null,
-    val isOffline: Boolean = false,
-)
-
 @HiltViewModel
 class AlertHistoryViewModel @Inject constructor(
     private val alertRepository: AlertRepository,
@@ -40,11 +33,26 @@ class AlertHistoryViewModel @Inject constructor(
             val result = alertRepository.getHistory()
             result.fold(
                 onSuccess = { history ->
-                    _uiState.update { it.copy(isLoading = false, history = history) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            history = history,
+                            filteredHistory = applyFilter(history, it.selectedFilter),
+                        )
+                    }
                 },
                 onFailure = { error ->
                     _uiState.update { it.copy(isLoading = false, error = error.message) }
                 },
+            )
+        }
+    }
+
+    fun setFilter(filter: AlertHistoryFilter) {
+        _uiState.update {
+            it.copy(
+                selectedFilter = filter,
+                filteredHistory = applyFilter(it.history, filter),
             )
         }
     }
@@ -54,6 +62,25 @@ class AlertHistoryViewModel @Inject constructor(
             networkMonitor.isOnline.collect { online ->
                 _uiState.update { it.copy(isOffline = !online) }
             }
+        }
+    }
+
+    private fun applyFilter(
+        history: List<SafetyAlert>,
+        filter: AlertHistoryFilter,
+    ): List<SafetyAlert> = when (filter) {
+        AlertHistoryFilter.ALL -> history
+        AlertHistoryFilter.SOS -> history.filter {
+            it.triggerType.contains("manual", ignoreCase = true) ||
+                it.triggerType.contains("sos", ignoreCase = true)
+        }
+        AlertHistoryFilter.AI -> history.filter {
+            it.triggerType.contains("ai", ignoreCase = true) ||
+                it.triggerType.contains("audio", ignoreCase = true)
+        }
+        AlertHistoryFilter.LOCATION -> history.filter {
+            it.triggerType.contains("location", ignoreCase = true) ||
+                (it.latitude != null && it.longitude != null)
         }
     }
 }

@@ -93,7 +93,7 @@ def handle_audio_sos(
 
     if fusion["action"] == "fire_immediately":
         try:
-            alert = trigger_alert(
+            alert, _notification = trigger_alert(
                 db=db,
                 user_id=user_id,
                 trigger_type="ai_audio",
@@ -142,7 +142,7 @@ def handle_movement_sos(
     # Fall with no user response = fire immediately
     if fall_detected:
         try:
-            alert = trigger_alert(
+            alert, _notification = trigger_alert(
                 db=db,
                 user_id=user_id,
                 trigger_type="ai_movement",
@@ -167,7 +167,7 @@ def handle_movement_sos(
 
     if fusion["action"] == "fire_immediately":
         try:
-            alert = trigger_alert(
+            alert, _notification = trigger_alert(
                 db=db,
                 user_id=user_id,
                 trigger_type="ai_movement",

@@ -188,3 +188,35 @@ def test_confidence_query():
     )
     assert fire.json()["action"] == "fire_immediately"
     assert fire.json()["activate_gps_stream"] is True
+
+
+def test_latest_model_version():
+    headers = _register_verified()
+    resp = client.get("/api/v1/ai/models/latest?model_type=audio", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["model_type"] == "audio"
+    assert body["version"] == "v1.0"
+    assert body["status"] == "active"
+
+
+def test_queue_dataset_sample():
+    headers = _register_verified()
+    wav_bytes = b"RIFF" + (b"\x00" * 40)
+    resp = client.post(
+        "/api/v1/ai/datasets/queue",
+        headers=headers,
+        files={"audio": ("clip.wav", wav_bytes, "audio/wav")},
+        data={
+            "model_version": "v1.0",
+            "ai_confidence": "87.5",
+            "user_confirmation": "false",
+            "label": "false_positive",
+            "duration_seconds": "6.0",
+            "features_json": '{"rms":0.12,"pitch_hz":400}',
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "queued"
+    assert body["sample_id"]

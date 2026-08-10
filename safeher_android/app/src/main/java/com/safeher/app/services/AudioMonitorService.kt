@@ -7,9 +7,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.safeher.app.MainActivity
@@ -44,7 +46,12 @@ class AudioMonitorService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START -> {
-                startForeground(NOTIFICATION_ID, buildNotification())
+                // Enter foreground before any validation/async work (FGS timeout rule).
+                startForegroundWithMicrophoneType()
+                if (!audioPermissionManager.hasRecordAudioPermission()) {
+                    stopMonitoringInternal()
+                    return START_NOT_STICKY
+                }
                 startMonitoringLoop()
             }
         }
@@ -83,14 +90,22 @@ class AudioMonitorService : Service() {
             audioRecord = record
             record.startRecording()
 
-            val buffer = ShortArray(bufferSize)
+            val readBuffer = ShortArray(bufferSize)
+            val inferenceWindow = ShortArray(INFERENCE_WINDOW_SAMPLES)
+            var windowFill = 0
             while (isActive) {
-                val read = record.read(buffer, 0, buffer.size)
+                val read = record.read(readBuffer, 0, readBuffer.size)
                 if (read > 0) {
-                    val slice = buffer.copyOf(read)
+                    val slice = readBuffer.copyOf(read)
                     val rms = computeRms(slice)
                     aiSensorState.updateAudioLevel((rms / MAX_RMS).coerceIn(0f, 1f))
-                    aiSensorState.updateAudioBuffer(slice)
+                    for (i in 0 until read) {
+                        inferenceWindow[windowFill++] = readBuffer[i]
+                        if (windowFill >= INFERENCE_WINDOW_SAMPLES) {
+                            aiSensorState.updateAudioBuffer(inferenceWindow.copyOf())
+                            windowFill = 0
+                        }
+                    }
                 }
                 delay(SAMPLE_INTERVAL_MS)
             }
@@ -122,6 +137,19 @@ class AudioMonitorService : Service() {
             sum += normalized * normalized
         }
         return sqrt(sum / samples.size).toFloat()
+    }
+
+    private fun startForegroundWithMicrophoneType() {
+        val notification = buildNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildNotification(): Notification {
@@ -158,6 +186,7 @@ class AudioMonitorService : Service() {
         private const val CHANNEL_ID = "safeher_ai_monitoring"
         private const val NOTIFICATION_ID = 2001
         private const val SAMPLE_RATE = 16_000
+        private const val INFERENCE_WINDOW_SAMPLES = 16_000
         private const val SAMPLE_INTERVAL_MS = 500L
         private const val MAX_RMS = 0.25f
 

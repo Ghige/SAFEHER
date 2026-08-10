@@ -8,17 +8,26 @@ logger = logging.getLogger(__name__)
 _initialized = False
 
 
-def _init_firebase():
+def ensure_firebase_initialized() -> bool:
+    """Initialize Firebase Admin SDK once. Returns True if ready."""
     global _initialized
-    if not _initialized:
-        try:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-            firebase_admin.initialize_app(cred, {
-                "databaseURL": settings.FIREBASE_DATABASE_URL
-            })
-            _initialized = True
-        except Exception as e:
-            logger.error(f"Firebase init failed: {e}")
+    if _initialized:
+        return True
+    try:
+        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+        options = {}
+        if settings.FIREBASE_DATABASE_URL:
+            options["databaseURL"] = settings.FIREBASE_DATABASE_URL
+        firebase_admin.initialize_app(cred, options or None)
+        _initialized = True
+        return True
+    except Exception as e:
+        logger.error(f"Firebase init failed: {e}")
+        return False
+
+
+def _init_firebase():
+    ensure_firebase_initialized()
 
 
 def push_location_update(alert_id: str, latitude: float, longitude: float, user_name: str):

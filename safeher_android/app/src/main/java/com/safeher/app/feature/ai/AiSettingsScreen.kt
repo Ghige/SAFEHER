@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.safeher.app.R
-import com.safeher.app.feature.ai.components.AiToggleCard
 
 @Composable
 fun AiSettingsScreen(
@@ -43,10 +42,10 @@ fun AiSettingsScreen(
                 style = MaterialTheme.typography.headlineSmall,
             )
 
-            AiToggleCard(
-                enabled = uiState.monitoringEnabled,
-                isMonitoring = uiState.monitoringEnabled,
-                onToggle = viewModel::setMonitoringEnabled,
+            Text(
+                text = stringResource(R.string.ai_settings_monitoring_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Surface(

@@ -11,10 +11,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
-    # Twilio WhatsApp
-    TWILIO_ACCOUNT_SID: str = ""
-    TWILIO_AUTH_TOKEN: str = ""
-    TWILIO_WHATSAPP_NUMBER: str = "whatsapp:+14155238886"
+    # Meta WhatsApp Cloud API (emergency contact messages)
+    META_ACCESS_TOKEN: str = ""
+    META_PHONE_NUMBER_ID: str = ""
+    META_WABA_ID: str = ""
+    # Dev default: hello_world (Meta sample template). Override for production templates.
+    META_WHATSAPP_TEMPLATE_ALERT: str = ""
+    META_WHATSAPP_TEMPLATE_CANCEL: str = ""
+    META_WHATSAPP_TEMPLATE_LANGUAGE: str = ""
 
     # Firebase
     FIREBASE_CREDENTIALS_PATH: str = "./firebase-credentials.json"
@@ -40,6 +44,10 @@ class Settings(BaseSettings):
     # Country code for WhatsApp (e.g. "91" for India, "1" for US)
     PHONE_COUNTRY_CODE: str = "91"
 
+    # Public URLs (no trailing slash)
+    TRACK_BASE_URL: str = "https://safeher.app/track"
+    API_BASE_URL: str = "https://api.safeher.app"
+
     # Rate limiting (requests per period)
     RATE_LIMIT_AUTH_PER_MINUTE: int = 5
     RATE_LIMIT_ALERT_PER_MINUTE: int = 10
@@ -49,9 +57,8 @@ class Settings(BaseSettings):
 
     # OTP settings
     OTP_EXPIRY_MINUTES: int = 10
-    # OTP provider: "twilio_verify" | "mock" (mock = dev only)
+    # OTP provider: "mock" (dev only)
     OTP_PROVIDER: str = "mock"
-    TWILIO_VERIFY_SERVICE_SID: str = ""
 
     class Config:
         env_file = ".env"

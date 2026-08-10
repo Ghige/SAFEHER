@@ -11,7 +11,6 @@ python-dotenv
 psycopg2-binary
 email-validator
 bcrypt
-twilio
 firebase-admin
 redis
 httpx

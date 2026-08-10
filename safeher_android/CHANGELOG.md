@@ -1,5 +1,148 @@
 # SafeHer Android Changelog
 
+## Task 10 — Production Hardening (2026-08-02)
+
+> **Scope:** Audit, optimize, secure, and stabilize the Android app for production release. No new user-facing features. No backend API changes.
+
+### Audit Summary
+
+Full project review covered: duplicate code, dead code, navigation, coroutines, DataStore, Hilt, Retrofit/OkHttp, FGS, WorkManager, security, Maps, release build, crash handling, and Play Store readiness.
+
+### Files Created
+
+- `app/src/main/res/xml/network_security_config.xml` — HTTPS-only in release
+- `app/src/debug/res/xml/network_security_config.xml` — cleartext allowed for debug emulator
+- `app/src/main/res/xml/data_extraction_rules.xml` — exclude encrypted token prefs from backup
+- `app/src/main/res/xml/backup_rules.xml` — legacy backup exclusion rules
+- `core/network/RepositoryApiCall.kt` — shared API error wrapper (deduplicated 7 repositories)
+- `services/NotificationChannelManager.kt` — create FGS channels once at app init
+- `keystore.properties.example` — release signing template
+
+### Files Modified
+
+| Area | Changes |
+|------|---------|
+| **Security** | `allowBackup=false`; token prefs excluded from backup; cleartext disabled in release; JWT in-memory cache (`SecureTokenStore`); `commit()` for token writes; backend URL hidden in release Security screen |
+| **Network** | Removed `runBlocking` from `AuthInterceptor` and `UnauthorizedInterceptor` |
+| **Release** | Expanded `proguard-rules.pro` (Maps, Compose, WorkManager, Hilt); conditional release signing from `keystore.properties` |
+| **Performance** | Removed unused deps (Room, Coil, Lottie, SplashScreen lib); deduplicated repository `apiCall` helpers |
+| **AI hardening** | `AiMonitoringCoordinator` respects SettingsStore audio/movement/sensitivity toggles; mic FGS only when models available + audio enabled |
+| **WorkManager** | `LocationWorker` — network constraint, exponential backoff, unique work name |
+| **Maps** | `LocationMap` graceful fallback when `MAPS_API_KEY` missing |
+| **Crash handling** | Release uncaught exception guard in `SafeHerApp` (no PII/token logging) |
+| **Dead code** | Removed unused `PlaceholderScreen`; splash uses `Route.HOME` |
+| **Gradle** | `keystore.properties` gitignored |
+
+### Build & Test Results
+
+| Command | Result |
+|---------|--------|
+| `./gradlew assembleRelease` | **SUCCESS** (R8 + shrinkResources) |
+| `./gradlew assembleDebug` | **SUCCESS** |
+| `./gradlew testDebugUnitTest` | **119/119 PASS** |
+
+### Security Fixes
+
+- Cleartext HTTP blocked in release builds
+- App backup disabled; encrypted JWT prefs excluded from device transfer
+- No tokens logged in release crash handler
+- OkHttp interceptors no longer block worker threads
+- Backend URL not exposed in release Security screen
+
+### Known Blockers (Production)
+
+- **Release keystore** — create `keystore.properties` from example before Play upload
+- **TFLite models** — still missing from `assets/`; AI inference remains stubbed
+- **FCM / push** — no client-side push stack; notification preference toggles stored locally only
+- **Crash reporting** — no Crashlytics/Sentry integrated yet
+- **Background location** — not declared in manifest; Play data-safety declaration needed
+- **Adaptive icon** — still using notification drawable as launcher icon
+- **Certificate pinning** — not implemented
+
+---
+
+## Task 9 — Settings & Security (2026-08-02)
+
+> **Scope:** Production-ready Settings module — user preferences, privacy, security, permissions, notifications, AI preferences, and app information. No backend API changes. Local DataStore for preferences without backend support. Reuses `SessionCleanupManager` for logout.
+
+### Files Created
+
+**Feature (`feature/settings/`)**
+- `SettingsScreen.kt`, `SettingsViewModel.kt`, `SettingsUiState.kt`, `SettingsEvent.kt`
+- `AboutScreen.kt`, `PrivacyPolicyScreen.kt`, `TermsScreen.kt`
+- `PermissionScreen.kt`, `NotificationSettingsScreen.kt`, `SecurityScreen.kt`, `BatteryOptimizationScreen.kt`
+
+**Components (`feature/settings/components/`)**
+- `SettingsCard.kt`, `SettingsItem.kt`, `PermissionStatusCard.kt`
+- `TogglePreference.kt`, `SectionHeader.kt`, `LoadingSettings.kt`
+
+**Data layer**
+- `domain/model/SettingsModels.kt` — `AppThemeMode`, `AiSensitivity`, `PermissionDisplayStatus`, `PermissionStatuses`, `SecurityInfo`
+- `domain/repository/SettingsRepository.kt`, `data/repository/SettingsRepositoryImpl.kt`
+- `core/datastore/SettingsStore.kt`
+- `services/BatteryOptimizationManager.kt`
+
+**Tests**
+- `SettingsRepositoryImplTest.kt` (8 tests)
+- `SettingsViewModelTest.kt` (5 tests)
+
+### Files Modified
+- `Route.kt` — `SETTINGS`, `SETTINGS_PERMISSIONS`, `SETTINGS_NOTIFICATIONS`, `SETTINGS_SECURITY`, `SETTINGS_ABOUT`, `SETTINGS_PRIVACY`, `SETTINGS_TERMS`, `SETTINGS_BATTERY`
+- `DashboardNavigation.kt` — Settings quick action, sub-screen navigation, logout hook
+- `RepositoryModule.kt` — `SettingsRepository` DI binding
+- `MainActivity.kt` — theme mode from `SettingsStore` (system / light / dark)
+- `strings.xml` — settings, privacy, security, permission strings
+
+### Screens
+| Screen | Purpose |
+|--------|---------|
+| Settings (hub) | Account, AI, notifications, permissions, appearance, about |
+| Permissions | Location, microphone, notifications, background location + runtime requests |
+| Notifications | Master toggle + SOS / helper / AI notification prefs |
+| Security | JWT, session, verified phone, app version, backend URL |
+| Battery | Optimization status + guide to disable restriction |
+| About | Version, developer, privacy, terms, licenses |
+| Privacy Policy | Location, mic, contacts, AI, data storage explanations |
+| Terms | Usage terms and emergency disclaimer |
+
+### DataStore Keys (`SettingsStore`)
+| Key | Type | Default |
+|-----|------|---------|
+| `notifications_enabled` | Boolean | true |
+| `sos_notifications` | Boolean | true |
+| `helper_notifications` | Boolean | true |
+| `ai_notifications` | Boolean | true |
+| `ai_audio_detection` | Boolean | true |
+| `ai_movement_detection` | Boolean | true |
+| `ai_sensitivity` | String | `"medium"` |
+| `theme_mode` | String | `"system"` |
+| `language` | String | `"en"` |
+
+AI monitoring enabled remains in **AiSettingsStore** (`ai_monitoring_enabled`).
+
+### Permissions Handled
+- `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — status display + runtime request
+- `RECORD_AUDIO` — status display + runtime request
+- `POST_NOTIFICATIONS` — status display + runtime request (API 33+)
+- Background location — status only (not declared in manifest; shows NOT_REQUESTED / DENIED)
+- Battery optimization — detect + open system settings
+- `FOREGROUND_SERVICE` — manifest-only (no runtime prompt)
+
+### Build & Test Results
+
+| Command | Result |
+|---------|--------|
+| `./gradlew assembleDebug` | **SUCCESS** |
+| `./gradlew testDebugUnitTest` | **119/119 PASS** |
+
+### Known TODOs
+- Language selector UI (DataStore key exists; no locale switching wired yet)
+- Open-source licenses screen (placeholder item in About)
+- `ACCESS_BACKGROUND_LOCATION` not in manifest — background location must be added before production background tracking
+- Permanently-denied permission detection requires Activity `shouldShowRationale` (repository shows DENIED; PermissionScreen handles re-request)
+
+---
+
 ## Task 8 — AI Monitoring (2026-08-02)
 
 > **Scope:** Full AI Monitoring module with backend integration, lifecycle-aware monitoring services, and extension points for on-device TFLite models. No fake AI inference. No Task 9 Settings module.

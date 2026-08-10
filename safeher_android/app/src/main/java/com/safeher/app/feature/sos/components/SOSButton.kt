@@ -7,86 +7,119 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.safeher.app.core.designsystem.SafeHerDanger
+import com.safeher.app.core.designsystem.SafeHerLightPink
+import com.safeher.app.core.designsystem.SafeHerOnPrimary
+import com.safeher.app.core.designsystem.SafeHerPrimary
+import com.safeher.app.core.designsystem.SafeHerSecondaryPink
 
 @Composable
 fun SOSButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    subtitle: String = "Tap or hold to\nsend alert",
+    holdHint: String = "Hold for 3 seconds",
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "sos_pulse")
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "sos_scale",
     )
 
-    Box(
+    Column(
         modifier = modifier,
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier = Modifier
-                .size(220.dp)
-                .scale(if (enabled) scale else 1f)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
+        Box(contentAlignment = Alignment.Center) {
+            listOf(200.dp, 170.dp, 140.dp).forEachIndexed { index, ringSize ->
+                Box(
+                    modifier = Modifier
+                        .size(ringSize)
+                        .scale(if (enabled && index == 0) scale else 1f)
+                        .clip(CircleShape)
+                        .background(
+                            when (index) {
+                                0 -> SafeHerLightPink.copy(alpha = 0.45f)
+                                1 -> SafeHerSecondaryPink.copy(alpha = 0.35f)
+                                else -> SafeHerSecondaryPink.copy(alpha = 0.2f)
+                            },
                         ),
-                    ),
-                ),
-        )
-        Box(
-            modifier = Modifier
-                .size(180.dp)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.error,
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
-                        ),
-                    ),
                 )
-                .clickable(
-                    enabled = enabled,
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "SOS",
-                color = MaterialTheme.colorScheme.onError,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(SafeHerPrimary)
+                    .pointerInput(enabled, onClick) {
+                        if (enabled) {
+                            detectTapGestures(onTap = { onClick() })
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "SOS",
+                    color = SafeHerOnPrimary,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
+
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .then(Modifier),
+        )
+        Text(
+            text = holdHint,
+            style = MaterialTheme.typography.labelSmall,
+            color = SafeHerDanger,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+    }
+}
+
+@Composable
+fun HomeSosSection(
+    onSosClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        SOSButton(
+            onClick = onSosClick,
+            enabled = enabled,
+        )
     }
 }

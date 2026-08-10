@@ -14,8 +14,9 @@ from datetime import datetime
 from app.models.alert import Alert
 from app.models.user import User
 from app.models.contact import EmergencyContact
-from app.services.whatsapp_service import send_whatsapp_alert
+from app.services.meta_whatsapp_service import send_whatsapp_alert
 from app.services.firebase_service import set_alert_status
+from app.services.fcm_service import notify_alert_escalated
 from app.services import redis_service
 from app.config import settings
 import logging
@@ -45,10 +46,10 @@ def check_dead_switches(db: Session) -> None:
         last_ping_ts = redis_service.get_last_ping(alert_id)
 
         if last_ping_ts is None:
-            # No ping yet — set baseline using alert start time
-            from datetime import timezone
+            # No ping yet — baseline from alert start so dead switch uses real elapsed time
             import time
-            redis_service.record_ping(alert_id)
+            baseline = alert.started_at.timestamp() if alert.started_at else time.time()
+            redis_service.record_ping(alert_id, timestamp=baseline)
             continue
 
         from datetime import datetime as dt
@@ -77,14 +78,21 @@ def _escalate_alert(db: Session, alert: Alert) -> None:
         EmergencyContact.is_active == True
     ).all()
 
+    from app.api.v1.location import create_track_token
+    track_token = create_track_token(str(alert.id))
+
     for contact in contacts:
         send_whatsapp_alert(
             to_phone=contact.phone_number,
             user_name=user.name if user else "User",
-            latitude=float(alert.latitude or 0),
-            longitude=float(alert.longitude or 0),
+            latitude=float(alert.latitude) if alert.latitude is not None else None,
+            longitude=float(alert.longitude) if alert.longitude is not None else None,
             alert_id=str(alert.id),
-            trigger_type="escalated"
+            trigger_type="escalated",
+            track_token=track_token,
         )
+
+    if user and user.fcm_token:
+        notify_alert_escalated(user.fcm_token, user.name)
 
     logger.info(f"Alert {alert.id} escalated — contacts re-notified")

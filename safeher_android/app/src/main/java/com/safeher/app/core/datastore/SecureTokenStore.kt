@@ -23,14 +23,24 @@ class SecureTokenStore @Inject constructor(
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
+    @Volatile
+    private var cachedToken: String? = prefs.getString(KEY_ACCESS_TOKEN, null)
+
+    fun getAccessTokenSync(): String? = cachedToken
+
     suspend fun saveAccessToken(token: String) {
-        prefs.edit().putString(KEY_ACCESS_TOKEN, token).apply()
+        prefs.edit().putString(KEY_ACCESS_TOKEN, token).commit()
+        cachedToken = token
     }
 
-    suspend fun getAccessToken(): String? = prefs.getString(KEY_ACCESS_TOKEN, null)
+    suspend fun getAccessToken(): String? {
+        cachedToken?.let { return it }
+        return prefs.getString(KEY_ACCESS_TOKEN, null)?.also { cachedToken = it }
+    }
 
     suspend fun clear() {
-        prefs.edit().remove(KEY_ACCESS_TOKEN).apply()
+        prefs.edit().remove(KEY_ACCESS_TOKEN).commit()
+        cachedToken = null
     }
 
     companion object {

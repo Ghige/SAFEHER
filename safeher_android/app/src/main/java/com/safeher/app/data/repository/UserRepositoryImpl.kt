@@ -9,6 +9,8 @@ import com.safeher.app.domain.repository.UserRepository
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,9 +22,18 @@ class UserRepositoryImpl @Inject constructor(
     private val moshi: Moshi,
 ) : UserRepository {
 
+    private val cacheMutex = Mutex()
+    private var cachedProfile: UserProfile? = null
+
     override fun observeNetworkStatus(): Flow<Boolean> = networkMonitor.isOnline
 
-    override suspend fun getProfile(): Result<UserProfile> {
+    override suspend fun getProfile(forceRefresh: Boolean): Result<UserProfile> {
+        if (!forceRefresh) {
+            cacheMutex.withLock {
+                cachedProfile?.let { return Result.success(it) }
+            }
+        }
+
         return try {
             if (!networkMonitor.isOnline.first()) {
                 Result.failure(Exception("You are offline. Connect to the internet and try again."))
@@ -32,19 +43,23 @@ class UserRepositoryImpl @Inject constructor(
                     Result.failure(Exception("Profile data is incomplete."))
                 } else {
                     val isVerified = userPreferences.isPhoneVerified.first()
-                    Result.success(
-                        UserProfile(
-                            id = dto.id,
-                            phoneNumber = dto.phone_number,
-                            name = dto.name,
-                            city = dto.city,
-                            isVerified = isVerified,
-                        ),
+                    val profile = UserProfile(
+                        id = dto.id,
+                        phoneNumber = dto.phone_number,
+                        name = dto.name,
+                        city = dto.city,
+                        isVerified = isVerified,
                     )
+                    cacheMutex.withLock { cachedProfile = profile }
+                    Result.success(profile)
                 }
             }
         } catch (e: Exception) {
             Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
         }
+    }
+
+    override fun clearProfileCache() {
+        cachedProfile = null
     }
 }

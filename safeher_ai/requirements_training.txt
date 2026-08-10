@@ -1,0 +1,19 @@
+# SafeHer — AI Training Pipeline Dependencies
+# Install with: pip install -r requirements_training.txt
+
+# Core audio processing
+librosa==0.10.1
+soundfile==0.12.1
+
+
+# ML / Training
+tensorflow==2.15.0
+tensorflow-hub==0.16.1
+scikit-learn==1.4.0
+
+# Data handling
+numpy==1.26.4
+pandas==2.2.0
+
+# Progress bars
+tqdm==4.66.2
