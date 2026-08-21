@@ -261,7 +261,7 @@
     <string name="ai_action_silent">Low alert</string>
     <string name="ai_action_confirm">Confirm SOS</string>
     <string name="ai_action_fire">Emergency</string>
-    <string name="ai_models_missing">Audio distress model is not bundled yet. Add yamnet_distress_quant.tflite to app/src/main/assets/ to enable on-device detection.</string>
+    <string name="ai_models_missing">Audio AI models are unavailable. Ensure yamnet_embedding.tflite and safeher_classifier_v2.tflite are bundled in app/src/main/assets/.</string>
     <string name="ai_movement_coming_soon">Movement detection is coming soon in a future release.</string>
     <string name="ai_audio_permission_required">Microphone access is required for audio distress detection.</string>
     <string name="ai_grant_permission">Grant Permission</string>
