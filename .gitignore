@@ -97,3 +97,16 @@ mic_test.wav
 # Misc local assets
 ##############################
 ChatGPT Image*.png
+
+##############################
+# Local AI model backups
+##############################
+/models/
+/safeher_ai/models/backup_old/
+
+##############################
+# Local development artifacts
+##############################
+/ml_venv311/
+/safeher_ai/duplicate_files_removed.txt
+/safeher_android/gradle/gradle-daemon-jvm.properties
