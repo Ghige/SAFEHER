@@ -29,9 +29,9 @@ SafeHer is a personal-safety platform:
 
 - **Android app** (`safeher_android/`): Kotlin + Jetpack Compose, package `com.safeher.app`, versionName `2.0.0`, versionCode `1` (VERIFIED in `app/build.gradle.kts`).
 - **Backend** (`safeher_backend/`): FastAPI app `app.main:app`, JWT auth, PostgreSQL, optional Redis, Firebase Admin, Meta WhatsApp Cloud API.
-- **On-device AI**: quantized YAMNet TFLite `yamnet_distress_quant.tflite` bundled in the APK. Live path is confirm-first. `AI_AUTO_SOS_ENABLED=false` on Android and backend (VERIFIED). Manual SOS is separate.
+- **On-device AI:** SafeHer V2 audio pipeline bundled in the APK (VERIFIED on `main` after commit `0b975b6`): `yamnet_embedding.tflite` then `safeher_classifier_v2.tflite`. `AiModelVersion.AUDIO_DISTRESS = "v2.0"`. Live path is confirm-first in local uncommitted work; **whether that Stage 3 code is on GitHub is a known blocker** (see section 4). `AI_AUTO_SOS_ENABLED=false` on Android and backend when those flags exist. Manual SOS is separate.
 - **Web track page** (`safeher_web/track/`): static emergency-contact map page. Backend can serve it at `/track/` when the monorepo layout is intact.
-- **Training pipeline** (`safeher_ai/`): used to train/export TFLite. **Not required to run the app** if the production model files are present (they are tracked in Git; VERIFIED via `git ls-files`).
+- **Training pipeline** (`safeher_ai/`): V1 YAMNet fine-tune scripts plus V2 embedding/classifier scripts under `safeher_ai/training/*_v2.py`. **Not required to run the app** if the V2 model files are present (they are tracked in Git).
 
 A developer cloning this repository should **not** retrain the model just to run the application.
 
@@ -130,10 +130,11 @@ Do not treat a Git clone as a one-click install. The following must be completed
 4. **REQUIRES EXTERNAL ACCOUNT (optional for login-only local tests):** Firebase Admin JSON at `FIREBASE_CREDENTIALS_PATH` is required for backend FCM. Login/register against Postgres can work without it; push notifications will not. **NOT VERIFIED** whether every backend boot path fails hard if the JSON is missing.
 5. **REQUIRES MANUAL SETUP:** Physical phone and laptop must share Wi-Fi. Windows Firewall must allow inbound TCP 8000. Uvicorn must bind `0.0.0.0`.
 6. **WhatsApp / Twilio / Maps:** Not required to register/login with mock OTP. Required for real SMS OTP, maps tiles, and emergency WhatsApp. **REQUIRES EXTERNAL ACCOUNT.**
-7. **GitHub vs this working tree:** This documentation describes the workspace as of 2026-10-05, including `DEBUG_API_BASE_URL`. If a clone of `origin/main` is missing those files, Gradle/API URL behavior may differ. Check `git log` / `git status` after clone. See the final report from the authoring session.
-8. **Clean-machine install:** This guide was **not** executed on a blank PC as an end-to-end proof. Commands were checked against repository files, not against a fresh OS image.
-9. **Release signing:** `keystore.properties` and `*.jks` are gitignored. Debug builds do not need them. Play Store / release APK requires them (**REQUIRES USER CREDENTIAL**).
-10. **Training datasets:** `safeher_ai/data/` is gitignored and **not** required to run inference.
+7. **GitHub vs this working tree:** A clone of `origin/main` after this documentation push includes SafeHer **audio V2** assets (`yamnet_embedding.tflite` + `safeher_classifier_v2.tflite`) from commit `0b975b6`. This machine still has a large **uncommitted** Android/backend working tree (Stage 3 confirm-first, `DEBUG_API_BASE_URL`, Gradle `syncTfliteAsset` for the older `yamnet_distress_quant.tflite`, etc.). A colleague who only clones GitHub **will not** automatically get that uncommitted work. `DEBUG_API_BASE_URL` is documented from the local tree; if `DebugApiBaseUrl.kt` is missing on the clone, physical-device LAN override will not work until that code is committed.
+8. **Android asset / Gradle mismatch (local dirty tree):** Merged `main` **deleted** `safeher_android/app/src/main/assets/yamnet_distress_quant.tflite` and requires V2 files instead. Uncommitted local `app/build.gradle.kts` may still try to copy `yamnet_distress_quant.tflite`. Do not assume Gradle on GitHub matches the dirty local Gradle file.
+9. **Clean-machine install:** This guide was **not** executed on a blank PC as an end-to-end proof. Commands were checked against repository files, not against a fresh OS image.
+10. **Release signing:** `keystore.properties` and `*.jks` are gitignored. Debug builds do not need them. Play Store / release APK requires them (**REQUIRES USER CREDENTIAL**).
+11. **Training datasets:** `safeher_ai/data/` is gitignored and **not** required to run inference.
 
 ---
 
@@ -277,9 +278,12 @@ Never paste real secret values into this Markdown, the PDF, README, or chat logs
 | `safeher_android/app/google-services.json` | Yes (Gradle Google Services + FCM) | Android | `safeher_android/app/google-services.json` | Firebase Console download, or teammate via a private channel | **NO** |
 | `safeher_android/app/google-services.json.example` | Template | Humans | Already in repo | In Git | YES |
 | `safeher_android/keystore.properties` | Release only | Gradle signing | `safeher_android/keystore.properties` | Copy example; private keystore | **NO** |
-| `yamnet_distress_quant.tflite` | Yes (on-device AI) | Android assets / Gradle `syncTfliteAsset` | Tracked copies under assets, `safeher_ai/models/final/`, `safeher_backend/app/ai/audio_model/` | Already in Git | YES (model binary, not a secret) |
-| `yamnet_distress.tflite` | Optional (non-quant) | Training artifacts | `safeher_ai/models/final/` | In Git | YES |
-| Alembic versions `001`-`008` | Yes | DB schema | `safeher_backend/alembic/versions/` | In Git | YES |
+| `yamnet_embedding.tflite` | Yes (on-device V2) | Android assets | `safeher_android/app/src/main/assets/` and `safeher_ai/models/v2/` | Already in Git | YES |
+| `safeher_classifier_v2.tflite` | Yes (on-device V2) | Android assets | same | Already in Git | YES |
+| `yamnet_distress_quant.tflite` | Legacy V1 artifact | Training + backend copy | `safeher_ai/models/final/`, `safeher_backend/app/ai/audio_model/` | Still tracked; **removed from Android assets** on `main` (V2 commit) | YES (legacy) |
+| `yamnet_distress.tflite` | Optional legacy | Training artifacts | `safeher_ai/models/final/` | In Git | YES |
+| Alembic versions `001`-`006` | Yes on GitHub | DB schema | `safeher_backend/alembic/versions/` | In Git | YES |
+| Alembic `007`, `008` | Local only today | Uniqueness / AI feedback | same folder | Uncommitted on this machine | **NO** (not on `main` yet) |
 | `safeher_backend/docker-compose.p0.yml` | Optional | Redis / Postgres | `safeher_backend/` | In Git | YES |
 | CI secrets | CI only | GitHub Actions | Workflow env in `.github/workflows/ci.yml` uses dummy `SECRET_KEY` and test DB | In Git (dummy values) | YES (dummy only) |
 
@@ -446,7 +450,7 @@ From `safeher_backend` with venv active and `.env` loaded:
 alembic upgrade head
 ```
 
-Tracked revisions (VERIFIED filenames):
+Tracked revisions **on GitHub `main`** (VERIFIED via `git ls-files`):
 
 | Revision file | Purpose |
 |---------------|---------|
@@ -456,10 +460,8 @@ Tracked revisions (VERIFIED filenames):
 | `004_add_user_is_verified.py` | `is_verified` |
 | `005_add_user_fcm_token.py` | FCM token column |
 | `006_ai_dataset_and_model_versions.py` | AI dataset tables |
-| `007_uniqueness_alerts_contacts.py` | uniqueness constraints |
-| `008_ai_feedback_events.py` | AI feedback events |
 
-Exact live column lists: **NOT VERIFIED** in this guide beyond migration filenames; inspect the migration files if you need a schema dump.
+Local uncommitted files `007_uniqueness_alerts_contacts.py` and `008_ai_feedback_events.py` exist in this working tree but are **not** on GitHub `main`. A clone will only have `001`--`006` until those are committed. **KNOWN BLOCKER** if the unpublished backend code expects 007/008 tables.
 
 CI uses database `safeher_test` with user/password `safeher` -- that is for GitHub Actions only.
 
@@ -592,30 +594,30 @@ USB debugging on a physical phone: Settings > Developer options > USB debugging.
 
 ---
 
-## 13. AI / SafeHer model setup (as implemented)
+## 13. AI / SafeHer model setup (as implemented on GitHub `main`)
 
 | Item | Value | Status |
 |------|-------|--------|
-| Production on-device model | `yamnet_distress_quant.tflite` | VERIFIED |
-| Android asset name | `AiModelAssets.AUDIO_MODEL` | VERIFIED |
-| Format | TensorFlow Lite (quantized) | VERIFIED |
-| Bundled in APK? | Yes. Gradle copies into `app/src/main/assets/` if missing (`syncTfliteAsset`) | VERIFIED |
+| Current Android audio pipeline | YAMNet embedding TFLite + SafeHer classifier V2 | VERIFIED in `AiModelAssets.kt` on merged `main` |
+| Embedding model | `yamnet_embedding.tflite` | VERIFIED |
+| Classifier model | `safeher_classifier_v2.tflite` | VERIFIED |
+| Model version string | `AiModelVersion.AUDIO_DISTRESS = "v2.0"` | VERIFIED |
+| Bundled in APK? | Yes, under `safeher_android/app/src/main/assets/` | VERIFIED |
 | Downloaded at runtime? | No | VERIFIED |
 | Retrain required to run app? | **No** | VERIFIED |
-| Training dataset required for inference? | **No** (`safeher_ai/data/` gitignored) | VERIFIED |
-| Sample rate / window | 16 kHz mono, 1 second / 16000 samples (implementation in audio engine) | VERIFIED in Stage 3 audio pipeline comments/code |
-| Movement TFLite | **Not** on-device (`movement_model.tflite` not a required RC1 asset) | VERIFIED |
-| Speech sklearn | **Not** on-device; phrase catalog + optional Android SpeechRecognizer | VERIFIED |
-| Auto SOS | `AI_AUTO_SOS_ENABLED=false` (Android BuildConfig + backend settings) | VERIFIED |
-| Confirm-first | Backend `CONFIRMATION_WINDOW_SECONDS=30`; Android confirm-first popup | VERIFIED window setting; UI path exists in app services |
-| Backend copy of model | `safeher_backend/app/ai/audio_model/yamnet_distress_quant.tflite` | VERIFIED tracked |
-| Non-quant sibling | `safeher_ai/models/final/yamnet_distress.tflite` | VERIFIED tracked |
+| Training dataset required for inference? | **No** | VERIFIED |
+| Movement TFLite | **Not** a required RC1 asset | VERIFIED |
+| Auto SOS | `AI_AUTO_SOS_ENABLED=false` when those flags are present in the checkout | VERIFIED in local/backend templates; confirm Android BuildConfig on the clone |
+| Legacy V1 quant model | `yamnet_distress_quant.tflite` still in `safeher_ai/models/final/` and `safeher_backend/app/ai/audio_model/`; **deleted from Android assets** by V2 | VERIFIED |
+| Keras checkpoints | `safeher_ai/models/v2/*.keras` tracked | VERIFIED |
 
-Python training extras (`safeher_ai/requirements_training.txt`) are **optional**. Backend `numpy` is pinned for server-side helpers; on-device inference uses Android TensorFlow Lite `2.16.1` (`libs.versions.toml`).
+Python training extras (`safeher_ai/requirements_training.txt` and V2 scripts `01_prepare_dataset_v2.py` ... `06_verify_classifier_v2_tflite.py`) are **optional**. On-device inference uses Android TensorFlow Lite `2.16.1` (`libs.versions.toml`) **if that catalog is on the clone**.
 
-Do **not** replace the production TFLite as part of setup.
+Do **not** replace the V2 TFLite files as part of setup.
 
-Logcat filter for live AI (if Stage 3A is present in the checked-out code): tag `SAFEHER_AI`. If that tag is absent on an older commit, use `AudioMonitorService` / `TfliteAudioInferenceEngine`.
+**Local uncommitted note:** this workspace may still contain Stage 3 files that load `AiModelAssets.AUDIO_MODEL` / `yamnet_distress_quant.tflite`. That is **not** what a clean GitHub clone of merged `main` uses. Treat it as unpublished work.
+
+Logcat: filter the app package `com.safeher.app.debug`. V2 inference logs live in `TfliteAudioInferenceEngine`. Tag `SAFEHER_AI` exists only if Stage 3A observability was committed.
 
 ---
 
@@ -863,6 +865,6 @@ This guide does **not** claim a clean-machine installation was tested unless a l
 
 ## 19. Verification notes (authoring)
 
-Checked against repository files: Gradle versions, SDK levels, package name, `.env.example` keys, Alembic filenames, uvicorn module path `app.main:app`, ping routes, OTP shortcut, gitignore entries, TFLite names, debug/release URLs, compose Postgres sample, CI Python 3.11.
+Checked against repository files on 2026-10-05 after merging `origin/main` (`0b975b6` SafeHer V2 audio) with the documentation commit. Gradle versions, SDK levels, package name, `.env.example` keys, ping routes, OTP shortcut, gitignore, V2 TFLite names, debug/release URL logic in the **local** tree, compose Postgres sample, CI Python 3.11.
 
-Not executed as a blank-PC install. Android Studio exact version, OEM USB drivers, and live Firebase Console IAM were **NOT VERIFIED**.
+Not executed as a blank-PC install. Android Studio exact version, OEM USB drivers, live Firebase Console IAM, and a clean clone of only GitHub `main` (without this machine's uncommitted Stage 3 files) were **NOT VERIFIED** as a full run. Alembic files `007` and `008` were present locally as untracked -- **NOT VERIFIED** that GitHub `main` contains them until they are committed.
