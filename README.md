@@ -1,8 +1,26 @@
 # SafeHer
 
-SafeHer is a personal-safety platform that combines an Android app, FastAPI backend, on-device / server AI audio distress detection, Firebase messaging, and WhatsApp emergency-contact alerts with a live location track page.
+SafeHer is a personal-safety platform that combines an Android app, FastAPI backend, multi-signal AI (distress audio + emergency phrases + movement → Safety Decision Engine), Firebase messaging, and WhatsApp emergency-contact alerts with a live location track page.
 
 This repository is the team handover of the SafeHer monorepo (**source, models, and docs**). Large training datasets and local secrets are **not** included.
+
+---
+
+## Start here (complete fresh-machine setup)
+
+**The complete developer setup / handover guide** (clone GitHub, configure every required file, run FastAPI in VS Code, run Android in Android Studio, connect the phone/emulator to the backend, troubleshooting, security rules):
+
+- **PDF (print / share):** [`docs/SAFEHER_DEVELOPER_SETUP.pdf`](docs/SAFEHER_DEVELOPER_SETUP.pdf)
+- **Markdown (source of truth):** [`docs/SAFEHER_DEVELOPER_SETUP.md`](docs/SAFEHER_DEVELOPER_SETUP.md)
+
+Regenerate the PDF after editing the Markdown:
+
+```bash
+pip install fpdf2
+python scripts/generate_developer_setup_pdf.py
+```
+
+A shorter older onboarding PDF still exists as **TEAM_HANDOVER.pdf**. Use the `docs/SAFEHER_DEVELOPER_SETUP.*` files as the full setup path.
 
 ---
 
@@ -10,16 +28,17 @@ This repository is the team handover of the SafeHer monorepo (**source, models, 
 
 ```
 SAFEHER/
+├── docs/                # Complete developer setup guide (PDF + Markdown)
 ├── safeher_android/     # Kotlin + Jetpack Compose Android app
 ├── safeher_backend/     # FastAPI API, auth, alerts, location, AI endpoints
 ├── safeher_ai/          # YAMNet training / export pipeline + model artifacts
 ├── safeher_web/         # Static emergency contact track page
 ├── PRODUCTION_SETUP.md  # Production DNS / Firebase / WhatsApp checklist
-├── TEAM_HANDOVER.pdf    # Short team onboarding PDF (setup, pending work, tests)
+├── TEAM_HANDOVER.pdf    # Short team onboarding PDF
 └── README.md            # This file
 ```
 
-For a printable onboarding summary (Python 3.11 → venv → requirements → credentials, pending AI wallet work, and test cases), open **TEAM_HANDOVER.pdf**. Regenerate with:
+Regenerate the short handover PDF with:
 
 ```bash
 pip install fpdf2
@@ -190,9 +209,9 @@ Full labeling notes: `safeher_ai/README.md`.
 ## Team handover instructions
 
 1. Clone this repo; do **not** commit secrets.
-2. Obtain privately: backend `.env` values, Firebase Admin JSON, `google-services.json`, Maps key, WhatsApp tokens, and optionally `safeher_ai/data/`.
-3. Follow setup sections above for backend → Android → web → AI.
+2. Follow **[`docs/SAFEHER_DEVELOPER_SETUP.pdf`](docs/SAFEHER_DEVELOPER_SETUP.pdf)** (or the Markdown) end to end.
+3. Obtain privately: backend `.env` values, Firebase Admin JSON, `google-services.json`, Maps key, WhatsApp tokens, and optionally `safeher_ai/data/`.
 4. Read `PRODUCTION_SETUP.md` before production DNS/hosting changes.
 5. Rotate any credentials that were ever shared in chat, screenshots, or old commits.
 
-**Never commit:** `.env`, Firebase Admin SDK JSON, `google-services.json`, keystores, or raw user recordings without consent/license review.
+**Never commit:** `.env`, Firebase Admin SDK JSON, `google-services.json`, keystores, `local.properties` with machine paths/keys, or raw user recordings without consent/license review.

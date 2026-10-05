@@ -76,6 +76,11 @@ out/
 # SafeHer AI — keep code & models; exclude local datasets
 ##############################
 safeher_ai/data/
+# Allow speech dataset docs + empty scaffold markers (not audio)
+!safeher_ai/data/speech/
+!safeher_ai/data/speech/**/
+!safeher_ai/data/speech/**/*.md
+!safeher_ai/data/speech/**/.gitkeep
 
 ##############################
 # Logs & temp

@@ -1,3 +1,9 @@
 # Copy to local.properties (never commit local.properties)
 sdk.dir=C\:\\Users\\YourUser\\AppData\\Local\\Android\\Sdk
 MAPS_API_KEY=your_google_maps_api_key_here
+# Physical-device debug: FastAPI on this PC, reachable from the phone on the same Wi-Fi.
+# Use YOUR laptop LAN IPv4. DHCP addresses change; do not treat any example as permanent.
+# CURRENT MACHINE EXAMPLE ONLY — DO NOT USE AS A PERMANENT VALUE:
+#   DEBUG_API_BASE_URL=http://192.168.1.17:8000/
+# Leave unset (or comment out) to use the Android emulator host http://10.0.2.2:8000/
+# DEBUG_API_BASE_URL=

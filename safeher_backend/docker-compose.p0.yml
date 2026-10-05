@@ -1,0 +1,40 @@
+# Local / staging infrastructure for SafeHer P0 (Redis + optional Postgres).
+# Does NOT enable AI SOS. Does NOT send WhatsApp.
+#
+# Usage (requires Docker Desktop):
+#   docker compose -f docker-compose.p0.yml up -d
+#   python scripts/validate_redis.py
+#
+# This machine may not have Docker — compose file is for operators.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["with-db"]
+    environment:
+      POSTGRES_USER: safeher
+      POSTGRES_PASSWORD: safeher_dev_only_change_me
+      POSTGRES_DB: safeher_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - safeher_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safeher -d safeher_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  safeher_pg_data:
