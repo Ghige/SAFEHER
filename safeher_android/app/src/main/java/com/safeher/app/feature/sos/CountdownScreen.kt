@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun CountdownScreen(
-    onNavigateToActive: () -> Unit,
     onNavigateBack: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
     viewModel: SOSViewModel = rememberSosViewModel(),
@@ -41,7 +40,6 @@ fun CountdownScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                SOSEvent.NavigateToActive -> onNavigateToActive()
                 SOSEvent.NavigateBack -> onNavigateBack()
                 else -> Unit
             }

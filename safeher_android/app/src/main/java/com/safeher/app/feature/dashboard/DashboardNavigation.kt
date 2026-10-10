@@ -39,6 +39,8 @@ import com.safeher.app.feature.sos.AlertHistoryScreen
 import com.safeher.app.feature.sos.CountdownScreen
 import com.safeher.app.feature.sos.SOSEvent
 import com.safeher.app.feature.sos.SOSScreen
+import com.safeher.app.feature.ai.AiConfirmPromptHost
+import com.safeher.app.feature.ai.AiConfirmPromptViewModel
 import com.safeher.app.feature.ai.AiMonitoringScreen
 import com.safeher.app.feature.ai.AiMonitoringViewModel
 import com.safeher.app.feature.ai.AiSettingsScreen
@@ -76,6 +78,7 @@ fun DashboardNavigation(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val sosViewModel = rememberSosViewModel()
+    val confirmViewModel: AiConfirmPromptViewModel = hiltViewModel()
 
     LaunchedEffect(currentRoute) {
         Timber.d("DashboardNavigation: currentRoute=%s", currentRoute)
@@ -94,6 +97,7 @@ fun DashboardNavigation(
                     if (route != Route.SOS_ACTIVE) {
                         Timber.d("DashboardNavigation: navigate to SOS_ACTIVE from %s", route)
                         navController.navigate(Route.SOS_ACTIVE) {
+                            popUpTo(Route.SOS_COUNTDOWN) { inclusive = true }
                             launchSingleTop = true
                         }
                     }
@@ -102,7 +106,6 @@ fun DashboardNavigation(
                     navController.navigate(Route.SOS_COUNTDOWN) {
                         launchSingleTop = true
                     }
-                    sosViewModel.startCountdown()
                 }
                 else -> Unit
             }
@@ -163,6 +166,7 @@ fun DashboardNavigation(
         else -> stringResource(R.string.app_name)
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
@@ -279,12 +283,6 @@ fun DashboardNavigation(
 
             composable(Route.SOS_COUNTDOWN) {
                 CountdownScreen(
-                    onNavigateToActive = {
-                        navController.navigate(Route.SOS_ACTIVE) {
-                            popUpTo(Route.SOS) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    },
                     onNavigateBack = { navController.popBackStack() },
                     viewModel = sosViewModel,
                 )
@@ -293,7 +291,18 @@ fun DashboardNavigation(
             composable(Route.SOS_ACTIVE) {
                 ActiveAlertScreen(
                     onNavigateBack = {
-                        navController.popBackStack(Route.SOS, inclusive = false)
+                        val returnedHome = navController.popBackStack(
+                            DashboardRoutes.DASHBOARD,
+                            false,
+                        )
+                        if (!returnedHome) {
+                            navController.navigate(DashboardRoutes.DASHBOARD) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    inclusive = false
+                                }
+                                launchSingleTop = true
+                            }
+                        }
                     },
                     viewModel = sosViewModel,
                 )
@@ -350,8 +359,12 @@ fun DashboardNavigation(
             composable(Route.AI) { aiEntry ->
                 AiMonitoringScreen(
                     onNavigateToSosCountdown = {
-                        navController.navigate(Route.SOS_COUNTDOWN)
-                        sosViewModel.startCountdown()
+                        val route = navController.currentBackStackEntry?.destination?.route
+                        if (route != Route.SOS_COUNTDOWN) {
+                            navController.navigate(Route.SOS_COUNTDOWN) {
+                                launchSingleTop = true
+                            }
+                        }
                     },
                     onNavigateToActiveAlert = {
                         navController.navigate(Route.SOS_ACTIVE) {
@@ -417,6 +430,20 @@ fun DashboardNavigation(
                 BatteryOptimizationScreen()
             }
         }
+    }
+    AiConfirmPromptHost(
+        viewModel = confirmViewModel,
+        dialogEnabled = currentRoute != Route.SOS_COUNTDOWN &&
+            currentRoute != Route.SOS_ACTIVE,
+        onNavigateToSosCountdown = {
+            val route = navController.currentBackStackEntry?.destination?.route
+            if (route != Route.SOS_COUNTDOWN) {
+                navController.navigate(Route.SOS_COUNTDOWN) {
+                    launchSingleTop = true
+                }
+            }
+        },
+    )
     }
 }
 

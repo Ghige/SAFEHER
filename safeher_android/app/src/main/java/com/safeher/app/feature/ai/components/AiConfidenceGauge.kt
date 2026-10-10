@@ -111,17 +111,34 @@ fun AiEmergencyConfirmationCard(
     onConfirmSafe: () -> Unit,
     onConfirmSos: () -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
+    body: String? = null,
+    confirmLabel: String? = null,
+    dismissLabel: String? = null,
+    secondsRemaining: Int? = null,
 ) {
     SafeHerCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = stringResource(R.string.ai_emergency_confirm_title),
+                text = title ?: stringResource(R.string.ai_emergency_confirm_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = stringResource(R.string.ai_emergency_confirm_body),
+                text = body ?: stringResource(R.string.ai_emergency_confirm_body),
                 style = MaterialTheme.typography.bodyMedium,
+                color = SafeHerTextSecondary,
+            )
+            if (secondsRemaining != null) {
+                Text(
+                    text = stringResource(R.string.ai_confirm_countdown, secondsRemaining),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = stringResource(R.string.ai_confirm_no_auto_sos),
+                style = MaterialTheme.typography.bodySmall,
                 color = SafeHerTextSecondary,
             )
             androidx.compose.foundation.layout.Row(
@@ -131,13 +148,13 @@ fun AiEmergencyConfirmationCard(
                     onClick = onConfirmSafe,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(stringResource(R.string.ai_emergency_confirm_no))
+                    Text(dismissLabel ?: stringResource(R.string.ai_emergency_confirm_no))
                 }
                 androidx.compose.material3.Button(
                     onClick = onConfirmSos,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(stringResource(R.string.ai_emergency_confirm_yes))
+                    Text(confirmLabel ?: stringResource(R.string.ai_emergency_confirm_yes))
                 }
             }
         }

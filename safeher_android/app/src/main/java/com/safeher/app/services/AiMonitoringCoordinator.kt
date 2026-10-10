@@ -18,6 +18,7 @@ import com.safeher.app.services.ai.AudioRiskAssessment
 import com.safeher.app.services.ai.MovementInferenceEngine
 import com.safeher.app.services.ai.PendingAudioDetection
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,7 +78,10 @@ class AiMonitoringCoordinator @Inject constructor(
     private val _isIsolated = MutableStateFlow(false)
     val isIsolated: StateFlow<Boolean> = _isIsolated.asStateFlow()
 
-    private val _events = MutableSharedFlow<AiCoordinatorEvent>()
+    private val _events = MutableSharedFlow<AiCoordinatorEvent>(
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     val events: SharedFlow<AiCoordinatorEvent> = _events.asSharedFlow()
 
     val audioLevel = aiSensorState.audioLevel
@@ -182,14 +186,12 @@ class AiMonitoringCoordinator @Inject constructor(
     }
 
     /**
-     * User responded to the emergency confirmation dialog.
-     * [confirmedEmergency] true → proceed with backend-recommended action.
+     * User finished the screen-level help confirmation.
+     * [confirmedEmergency] true → manual SOS countdown only. Never calls AI SOS APIs.
      */
     fun onEmergencyConfirmation(confirmedEmergency: Boolean) {
         applicationScope.scope.launch {
             val detection = pendingDetection
-            val confidenceResult = pendingConfidenceResult
-            val scores = pendingScores
             pendingDetection = null
             pendingConfidenceResult = null
             pendingScores = null
@@ -211,8 +213,8 @@ class AiMonitoringCoordinator @Inject constructor(
 
             enterCooldown()
 
-            if (confirmedEmergency && confidenceResult != null && scores != null) {
-                executeConfidenceAction(confidenceResult, scores)
+            if (confirmedEmergency) {
+                _events.emit(AiCoordinatorEvent.NavigateToSosCountdown)
             } else {
                 audioHybridPipeline.reset()
                 _riskAssessment.value = null
@@ -364,6 +366,9 @@ class AiMonitoringCoordinator @Inject constructor(
     ) {
         when (confidenceResult.action) {
             AiAction.FIRE_IMMEDIATELY, AiAction.CONFIRM_30S -> {
+                if (alertSessionManager.activeAlert.value?.isOngoing == true) {
+                    return
+                }
                 val detection = pendingCycle?.let {
                     PendingAudioDetection(
                         rawConfidence = it.rawConfidence,
