@@ -174,7 +174,16 @@ class SOSViewModel @Inject constructor(
     }
 
     fun requestCancelActiveAlert() {
-        _uiState.update { it.copy(showCancelDialog = true) }
+        if (_uiState.value.isOffline) {
+            _uiState.update {
+                it.copy(
+                    showCancelDialog = false,
+                    error = OFFLINE_CANCEL_MESSAGE,
+                )
+            }
+            return
+        }
+        _uiState.update { it.copy(showCancelDialog = true, error = null) }
     }
 
     fun dismissCancelDialog() {
@@ -182,7 +191,18 @@ class SOSViewModel @Inject constructor(
     }
 
     fun confirmCancelActiveAlert() {
-        val alertId = alertSessionManager.activeAlert.value?.id ?: return
+        val alertId = alertSessionManager.activeAlert.value?.id
+            ?: _uiState.value.activeAlert?.id
+        if (alertId.isNullOrBlank()) {
+            _uiState.update {
+                it.copy(
+                    showCancelDialog = false,
+                    isLoading = false,
+                    error = MISSING_ALERT_ID_MESSAGE,
+                )
+            }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, showCancelDialog = false) }
             val result = alertRepository.cancelAlert(alertId)
@@ -263,5 +283,9 @@ class SOSViewModel @Inject constructor(
         const val COUNTDOWN_SECONDS = 5
         const val WHATSAPP_DELIVERY_WARNING =
             "Alert created but notifications may have failed."
+        const val OFFLINE_CANCEL_MESSAGE =
+            "You are offline. Connect to the internet to cancel this alert."
+        const val MISSING_ALERT_ID_MESSAGE =
+            "No active alert to cancel."
     }
 }
