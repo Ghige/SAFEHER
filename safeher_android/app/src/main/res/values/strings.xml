@@ -131,6 +131,8 @@
     <!-- Errors -->
     <string name="error_load_failed">Could not load profile</string>
     <string name="error_offline_title">No Internet Connection</string>
+    <string name="error_offline_banner">You are offline</string>
+    <string name="error_network">Network error. Check your connection.</string>
     <string name="error_empty_profile">Profile unavailable</string>
     <string name="action_retry">Retry</string>
 
@@ -175,6 +177,8 @@
     <string name="sos_cancel_title">Cancel Emergency Alert?</string>
     <string name="sos_cancel_message">This will notify your contacts that you are safe. Are you sure?</string>
     <string name="sos_cancel_confirm">Yes, I\'m Safe</string>
+    <string name="sos_cancel_offline">You are offline. Connect to the internet to cancel this alert.</string>
+    <string name="sos_cancel_returning">Alert cancelled. Returning home…</string>
     <string name="sos_status_active">Active</string>
     <string name="sos_status_escalated">Escalated</string>
     <string name="sos_status_cancelled">Cancelled</string>
@@ -194,6 +198,11 @@
     <string name="sos_preflight_background_hint">Keeps live tracking when the screen is off.</string>
     <string name="sos_preflight_battery">Battery unrestricted</string>
     <string name="sos_preflight_battery_hint">Prevents Android from stopping SOS heartbeats.</string>
+    <string name="sos_preflight_network">Internet connection</string>
+    <string name="sos_preflight_network_hint">SOS can queue offline, but delivery needs connectivity.</string>
+    <string name="sos_preflight_notifications">Notifications</string>
+    <string name="sos_preflight_notifications_hint">Needed for foreground SOS and location service alerts.</string>
+    <string name="sos_offline_queued">SOS is queued. Your alert will send automatically when you are back online.</string>
     <string name="sos_preflight_fix">Fix</string>
     <string name="sos_location_unavailable_warning">Location unavailable — your alert will still send, but contacts may not receive coordinates.</string>
     <string name="sos_whatsapp_delivery_warning">Alert created but notifications may have failed.</string>
@@ -263,6 +272,7 @@
     <string name="ai_action_fire">Emergency</string>
     <string name="ai_models_missing">Audio AI models are unavailable. Ensure yamnet_embedding.tflite and safeher_classifier_v2.tflite are bundled in app/src/main/assets/.</string>
     <string name="ai_movement_coming_soon">Movement detection is coming soon in a future release.</string>
+    <string name="ai_movement_imu_level">IMU activity: %1$d%%</string>
     <string name="ai_audio_permission_required">Microphone access is required for audio distress detection.</string>
     <string name="ai_grant_permission">Grant Permission</string>
     <string name="ai_open_settings">Open Settings</string>
@@ -275,6 +285,10 @@
     <string name="ai_status_models">On-device models</string>
     <string name="ai_status_models_ready">Ready</string>
     <string name="ai_status_models_missing">Missing — see assets/</string>
+    <string name="ai_status_runtime">On-device runtime</string>
+    <string name="ai_status_local_sde">Local decision</string>
+    <string name="ai_status_local_sde_body">State: %1$s · Action: %2$s · Audio latency: %3$s ms</string>
+    <string name="ai_status_phrase">Detected phrase</string>
     <string name="ai_status_foreground">App state</string>
     <string name="ai_status_foreground_active">Foreground — inference active</string>
     <string name="ai_status_foreground_paused">Background — inference paused</string>
@@ -305,10 +319,24 @@
     <string name="settings_ai_sensitivity">Sensitivity</string>
     <string name="settings_ai_help_improve">Help improve AI</string>
     <string name="settings_ai_help_improve_desc">Upload detection clips you confirm to improve future models. Off by default. Never uploads continuous audio.</string>
-    <string name="ai_emergency_confirm_title">Unusual audio detected</string>
-    <string name="ai_emergency_confirm_body">We detected unusual audio. Was this an emergency?</string>
-    <string name="ai_emergency_confirm_yes">Yes</string>
-    <string name="ai_emergency_confirm_no">No</string>
+    <string name="ai_emergency_confirm_title">We noticed signs that you may need help</string>
+    <string name="ai_emergency_confirm_body">You\'re not alone — someone can help you.</string>
+    <string name="ai_emergency_confirm_yes">I need help</string>
+    <string name="ai_emergency_confirm_no">I\'m okay</string>
+    <string name="ai_confirm_emergency_title">We noticed signs that you may need help</string>
+    <string name="ai_confirm_suspicious_title">We noticed signs that you may need help</string>
+    <string name="ai_confirm_emergency_body">You\'re not alone — someone can help you.</string>
+    <string name="ai_confirm_suspicious_body">You\'re not alone — someone can help you.</string>
+    <string name="ai_confirm_countdown">Confirm within %1$d seconds</string>
+    <string name="ai_confirm_no_auto_sos">SafeHer will not send SOS automatically.</string>
+    <string name="ai_confirm_help_title">We noticed signs that you may need help</string>
+    <string name="ai_confirm_help_body">You\'re not alone — someone can help you.</string>
+    <string name="ai_confirm_help_yes">I need help</string>
+    <string name="ai_confirm_help_no">I\'m okay</string>
+    <string name="ai_confirm_send_title">Send an emergency alert?</string>
+    <string name="ai_confirm_send_body">Would you like SafeHer to send an emergency alert to your trusted contact?</string>
+    <string name="ai_confirm_send_yes">Send Emergency Alert</string>
+    <string name="ai_confirm_send_no">Cancel</string>
     <string name="ai_rolling_confidence">Rolling confidence: %.1f · Risk: %s</string>
     <string name="settings_notifications_enable">Enable Notifications</string>
     <string name="settings_notifications_manage">Notification Preferences</string>
@@ -331,6 +359,11 @@
     <string name="settings_about_licenses">Open-source Licenses</string>
     <string name="settings_about_licenses_desc">Material 3, Jetpack Compose, and other libraries.</string>
     <string name="settings_about_licenses_intro">SafeHer uses the following open-source and platform libraries. Full license texts are available at the linked project pages.</string>
+    <string name="settings_delete_account">Delete account</string>
+    <string name="settings_delete_account_confirm_title">Delete account permanently?</string>
+    <string name="settings_delete_account_confirm_body">Your profile, contacts, and personal data will be removed. This cannot be undone.</string>
+    <string name="settings_delete_account_confirm">Delete</string>
+    <string name="settings_delete_account_cancel">Cancel</string>
     <string name="settings_privacy_policy">Privacy Policy</string>
     <string name="settings_terms">Terms &amp; Conditions</string>
     <string name="settings_privacy_body">SafeHer uses your location only during SOS alerts, live location sharing, and AI monitoring sessions you enable.\n\nMicrophone access is used solely for on-device audio distress detection when AI monitoring is active. Audio is processed locally; raw recordings are not uploaded.\n\nEmergency contacts you add are stored securely and shared only when you trigger an SOS.\n\nAI processing combines on-device sensor readings with backend confidence scoring. No fake inference is performed.\n\nAccount data, JWT tokens, and preferences are stored locally using encrypted storage (DataStore / EncryptedSharedPreferences).</string>

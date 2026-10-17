@@ -1,6 +1,7 @@
 package com.safeher.app.services.ai
 
 import android.content.Context
+import android.os.SystemClock
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tensorflow.lite.Interpreter
 import timber.log.Timber
@@ -20,6 +21,10 @@ class TfliteAudioInferenceEngine @Inject constructor(
     private val classifierInterpreter: Interpreter?
 
     override val isAvailable: Boolean
+    @Volatile override var lastLatencyMs: Long? = null
+        private set
+    @Volatile override var lastError: String? = null
+        private set
 
     init {
         yamnetInterpreter = loadInterpreter(
@@ -47,9 +52,15 @@ class TfliteAudioInferenceEngine @Inject constructor(
         audioSamples: ShortArray,
         sampleRate: Int,
     ): Double? {
+        val startedAt = SystemClock.elapsedRealtime()
+        fun finish(score: Double?, error: String?): Double? {
+            lastLatencyMs = SystemClock.elapsedRealtime() - startedAt
+            lastError = error
+            return score
+        }
 
-        val yamnet = yamnetInterpreter ?: return null
-        val classifier = classifierInterpreter ?: return null
+        val yamnet = yamnetInterpreter ?: return finish(null, "yamnet_unavailable")
+        val classifier = classifierInterpreter ?: return finish(null, "classifier_unavailable")
 
         if (sampleRate != EXPECTED_SAMPLE_RATE) {
             Timber.w(
@@ -57,7 +68,7 @@ class TfliteAudioInferenceEngine @Inject constructor(
                 sampleRate,
                 EXPECTED_SAMPLE_RATE,
             )
-            return null
+            return finish(null, "unexpected_sample_rate")
         }
 
         if (audioSamples.size != EXPECTED_SAMPLES) {
@@ -66,7 +77,7 @@ class TfliteAudioInferenceEngine @Inject constructor(
                 audioSamples.size,
                 EXPECTED_SAMPLES,
             )
-            return null
+            return finish(null, "unexpected_sample_count")
         }
 
         // ---------------------------------------------------------
@@ -83,7 +94,7 @@ class TfliteAudioInferenceEngine @Inject constructor(
             sumAbs / audioSamples.size
 
         if (meanAbsoluteAmplitude < SILENCE_THRESHOLD) {
-            return 0.0
+            return finish(0.0, null)
         }
 
         // ---------------------------------------------------------
@@ -116,7 +127,7 @@ class TfliteAudioInferenceEngine @Inject constructor(
             )
         } catch (e: Exception) {
             Timber.e(e, "YAMNet inference failed")
-            return null
+            return finish(null, e.message ?: "yamnet_inference_failed")
         }
 
         // ---------------------------------------------------------
@@ -133,7 +144,7 @@ class TfliteAudioInferenceEngine @Inject constructor(
             )
         } catch (e: Exception) {
             Timber.e(e, "SafeHer classifier inference failed")
-            return null
+            return finish(null, e.message ?: "classifier_inference_failed")
         }
 
         // ---------------------------------------------------------
@@ -153,7 +164,7 @@ class TfliteAudioInferenceEngine @Inject constructor(
             distressScore,
         )
 
-        return distressScore
+        return finish(distressScore, null)
     }
 
     private fun loadInterpreter(

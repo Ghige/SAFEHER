@@ -9,5 +9,7 @@ interface UserRepository {
 
     suspend fun getProfile(forceRefresh: Boolean = false): Result<UserProfile>
 
+    suspend fun deleteAccount(): Result<Unit>
+
     fun clearProfileCache()
 }

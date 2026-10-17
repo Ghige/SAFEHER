@@ -103,6 +103,25 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeletingAccount = true, error = null) }
+            val result = userRepository.deleteAccount()
+            result.fold(
+                onSuccess = {
+                    settingsRepository.logout()
+                    _uiState.update { it.copy(isDeletingAccount = false) }
+                    _events.emit(SettingsEvent.NavigateToLogin)
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(isDeletingAccount = false, error = error.message)
+                    }
+                },
+            )
+        }
+    }
+
     fun navigateTo(event: SettingsEvent) {
         viewModelScope.launch { _events.emit(event) }
     }

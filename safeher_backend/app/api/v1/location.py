@@ -67,7 +67,7 @@ def decode_track_token(token: str) -> str:
 def _rate_limit_location(request, user_id: str) -> None:
     allowed = check_rate_limit(
         identifier=f"location:{user_id}",
-        limit=settings.RATE_LIMIT_ALERT_PER_MINUTE,
+        limit=settings.RATE_LIMIT_LOCATION_PER_MINUTE,
         window_seconds=60,
     )
     if not allowed:

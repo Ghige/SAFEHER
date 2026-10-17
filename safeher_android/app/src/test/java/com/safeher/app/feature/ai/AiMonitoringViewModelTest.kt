@@ -8,6 +8,10 @@ import com.safeher.app.services.AiCoordinatorEvent
 import com.safeher.app.services.AiMonitoringCoordinator
 import com.safeher.app.services.AudioPermissionManager
 import com.safeher.app.services.AudioPermissionStatus
+import com.safeher.app.services.ai.AiConfirmFirstPolicy
+import com.safeher.app.services.ai.AiInferenceSnapshot
+import com.safeher.app.services.ai.AiModelRuntimeStatus
+import com.safeher.app.services.ai.AudioRiskAssessment
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -47,6 +51,20 @@ class AiMonitoringViewModelTest {
     private val isIsolated = MutableStateFlow(false)
     private val isAppInForeground = MutableStateFlow(true)
     private val events = MutableSharedFlow<AiCoordinatorEvent>()
+    private val riskAssessment = MutableStateFlow<AudioRiskAssessment?>(null)
+    private val inferenceSnapshot = MutableStateFlow<AiInferenceSnapshot?>(null)
+    private val confirmSecondsRemaining = MutableStateFlow(0)
+    private val confirmPromptKind = MutableStateFlow<AiConfirmFirstPolicy.PromptKind?>(null)
+    private val modelStatus = MutableStateFlow(
+        AiModelRuntimeStatus(
+            audioAvailable = true,
+            audioDetail = "test",
+            speechMode = AiModelRuntimeStatus.SpeechMode.CATALOG_READY,
+            speechDetail = "test",
+            movementAvailable = false,
+            movementDetail = "unavailable",
+        ),
+    )
 
     @Before
     fun setup() {
@@ -62,6 +80,11 @@ class AiMonitoringViewModelTest {
         every { coordinator.isIsolated } returns isIsolated
         every { coordinator.isAppInForeground } returns isAppInForeground
         every { coordinator.events } returns events
+        every { coordinator.riskAssessment } returns riskAssessment
+        every { coordinator.modelStatus } returns modelStatus
+        every { coordinator.inferenceSnapshot } returns inferenceSnapshot
+        every { coordinator.confirmSecondsRemaining } returns confirmSecondsRemaining
+        every { coordinator.confirmPromptKind } returns confirmPromptKind
         every { audioPermissionManager.hasRecordAudioPermission() } returns true
         every { audioPermissionManager.getPermissionStatus(any()) } returns AudioPermissionStatus.GRANTED
         coEvery { coordinator.setMonitoringEnabled(any()) } returns Unit

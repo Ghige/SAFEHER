@@ -1,0 +1,74 @@
+{
+  "contract_version": "1.0.0",
+  "name": "SafeHer Unified Safety Decision Contract",
+  "description": "Single decision contract for Audio + Speech + Movement fusion. Model training thresholds are NOT defined here — only post-model fusion.",
+  "DEMO_MODE": true,
+  "AI_AUTO_SOS_ENABLED": false,
+  "states": ["NORMAL", "SUSPICIOUS", "EMERGENCY"],
+  "actions": ["nothing", "silent_vibration", "confirm_30s", "fire_immediately"],
+  "state_from_action": {
+    "nothing": "NORMAL",
+    "silent_vibration": "NORMAL",
+    "confirm_30s": "SUSPICIOUS",
+    "fire_immediately": "EMERGENCY"
+  },
+  "gates": {
+    "distress_medium": 0.55,
+    "distress_high": 0.70,
+    "phrase_medium": 0.55,
+    "phrase_high": 0.75,
+    "movement_medium": 0.60,
+    "movement_high": 0.80,
+    "volume_loud": 0.70,
+    "distress_floor_medium": 0.60,
+    "distress_floor_high": 0.80
+  },
+  "weights": {
+    "distress": 0.40,
+    "phrase": 0.40,
+    "movement": 0.20,
+    "volume_feature": 0.05,
+    "multi_strong_bonus": 0.12,
+    "context_night_bonus": 0.05,
+    "context_isolated_bonus": 0.05,
+    "heart_rate_spike_bonus": 0.10
+  },
+  "risk_bands": {
+    "silent": 0.20,
+    "medium": 0.40,
+    "high": 0.65
+  },
+  "policy": {
+    "phrase_alone_can_reach_medium": true,
+    "phrase_alone_can_reach_high": false,
+    "audio_alone_can_reach_high_via_distress_floor": true,
+    "movement_alone_can_sos": false,
+    "volume_alone_can_sos": false,
+    "fall_is_fire_immediately": true,
+    "multi_strong_signals_bonus": true
+  },
+  "confirmation": {
+    "countdown_seconds": 30,
+    "api_action_name": "confirm_30s",
+    "note": "Action name confirm_30s matches countdown_seconds=30 (resolved Stage-3 naming mismatch).",
+    "cancel_result": "CANCELLED",
+    "no_response_demo_result": "TEST_SOS_TRIGGERED",
+    "real_sos_allowed_in_demo": false,
+    "stage8_confirm_first_beta": true,
+    "no_response_when_ai_auto_sos_disabled": "DISMISS_SAFE_NO_ALERT",
+    "user_confirm_when_ai_auto_sos_disabled": "MANUAL_SOS_COUNTDOWN",
+    "fall_bypasses_confirm_ui": false
+  },
+  "alert_creation": {
+    "requires_AI_AUTO_SOS_ENABLED": true,
+    "requires_action_fire_immediately": true,
+    "blocked_when_demo_mode": true,
+    "duplicate_active_alert": "reject",
+    "manual_sos_not_gated_by_ai_flag": true
+  },
+  "cancellation": {
+    "user_cancel_confirmation": "no_alert",
+    "user_cancel_active_alert": "cancel_alert_api",
+    "demo_cancel": "CANCELLED"
+  }
+}

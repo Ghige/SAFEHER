@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SafeHer Gold Eval v1 — Human review</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3240;
+    --tx:#e6edf3; --dim:#8b98a8; --accent:#4c9aff;
+    --distress:#f85149; --normal:#3fb950; --unc:#d29922;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--tx)}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  h1{font-size:14px;margin:0;font-weight:600}
+  .muted{color:var(--dim);font-size:12px}
+  select,button,input,textarea{font:inherit;color:var(--tx);background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 10px}
+  button{cursor:pointer}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+  .pill.warn{border-color:var(--unc);color:#e3b341}
+  main{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 118px)}
+  aside{border-right:1px solid var(--line);overflow-y:auto;background:#11151b}
+  .row{padding:8px 12px;border-bottom:1px solid #1b212b;cursor:pointer;display:flex;gap:8px;align-items:center}
+  .row.sel{background:#1d2735;box-shadow:inset 3px 0 0 var(--accent)}
+  .row .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#333c4a;flex:none}
+  .dot.DISTRESS{background:var(--distress)} .dot.NORMAL{background:var(--normal)} .dot.UNCERTAIN{background:var(--unc)}
+  section{overflow-y:auto;padding:20px 26px}
+  .banner{background:#2a2110;border:1px solid #6e5218;color:#e3b341;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:160px 1fr;gap:6px 12px}
+  .k{color:var(--dim)}
+  .verdicts{display:flex;gap:8px;flex-wrap:wrap}
+  .v{flex:1;min-width:140px;padding:12px;border-radius:10px;font-weight:600;border:1.5px solid var(--line);background:var(--panel2);text-align:left}
+  .v small{display:block;font-weight:400;color:var(--dim);font-size:11px;margin-top:3px}
+  .v.on[data-v=DISTRESS]{background:var(--distress);border-color:var(--distress);color:#06111f}
+  .v.on[data-v=NORMAL]{background:var(--normal);border-color:var(--normal);color:#06111f}
+  .v.on[data-v=UNCERTAIN]{background:var(--unc);border-color:var(--unc);color:#06111f}
+  audio{width:100%;margin-top:8px}
+  .targets{display:flex;gap:18px;padding:8px 18px;background:#11151b;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  kbd{background:#0b0e13;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Gold Eval v1 · human review</h1>
+  <label class="muted">reviewer_id <input id="reviewer" value="reviewer" autocomplete="username"></label>
+  <button id="reload">Reload</button>
+  <select id="filter">
+    <option value="todo">Unreviewed</option>
+    <option value="all">All</option>
+    <option value="done">Reviewed</option>
+    <option value="distress">Proposed DISTRESS</option>
+    <option value="hn">Proposed HARD_NEGATIVE</option>
+  </select>
+  <span class="pill warn">folder labels are not gold</span>
+</header>
+<div class="targets" id="targets"></div>
+<main>
+  <aside id="list"></aside>
+  <section id="detail">
+    <div class="banner">Load the queue, listen to the clip, then mark DISTRESS, NORMAL, or UNCERTAIN. Official Balanced-v1 threshold scoring uses only DISTRESS and NORMAL.</div>
+  </section>
+</main>
+<script>
+let items=[], verdicts={}, selected=null;
+const $ = id => document.getElementById(id);
+async function load(){
+  const rid = $("reviewer").value.trim() || "reviewer";
+  const r = await fetch("/api/items?reviewer_id="+encodeURIComponent(rid));
+  const data = await r.json();
+  items = data.items || [];
+  verdicts = data.my_verdicts || {};
+  const p = data.progress || {};
+  const c = p.counts || {};
+  $("targets").innerHTML =
+    `<span>Candidates <b>${p.candidates||0}</b></span>`+
+    `<span>Verified DISTRESS <b>${c.DISTRESS||0}</b></span>`+
+    `<span>Verified NORMAL <b>${c.NORMAL||0}</b></span>`+
+    `<span>UNCERTAIN <b>${c.UNCERTAIN||0}</b></span>`+
+    `<span>Unreviewed <b>${c.UNREVIEWED||0}</b></span>`+
+    `<span class="muted">HUMAN_VERIFIED = DISTRESS or NORMAL only</span>`;
+  renderList();
+  if(selected) show(selected); else if(visible()[0]) show(visible()[0].gold_id);
+}
+function visible(){
+  const f = $("filter").value;
+  return items.filter(it => {
+    const v = (verdicts[it.gold_id]||{}).manual_verdict || "";
+    if(f==="todo") return !v;
+    if(f==="done") return !!v;
+    if(f==="distress") return it.proposed_label==="DISTRESS";
+    if(f==="hn") return it.proposed_label==="HARD_NEGATIVE";
+    return true;
+  });
+}
+function renderList(){
+  $("list").innerHTML = visible().map(it => {
+    const v = (verdicts[it.gold_id]||{}).manual_verdict || "";
+    return `<div class="row ${it.gold_id===selected?'sel':''}" data-id="${it.gold_id}">
+      <i class="dot ${v}"></i>
+      <div class="t">${it.gold_id} · ${it.proposed_label} · ${it.category_group}</div>
+    </div>`;
+  }).join("");
+  [...$("list").querySelectorAll(".row")].forEach(el => el.onclick = () => show(el.dataset.id));
+}
+function show(id){
+  selected = id;
+  const it = items.find(x => x.gold_id===id);
+  if(!it) return;
+  renderList();
+  const mine = verdicts[id] || {};
+  $("detail").innerHTML = `
+    <div class="banner">Proposed label <b>${it.proposed_label}</b> comes from folder/metadata. It is <b>not</b> a verified gold label until you judge the audio.</div>
+    <div class="card">
+      <h2 style="margin:0 0 8px">${it.gold_id}</h2>
+      <audio controls src="/audio/${encodeURIComponent(it.gold_id)}"></audio>
+      <div class="grid" style="margin-top:12px">
+        <div class="k">Proposed label</div><div>${it.proposed_label}</div>
+        <div class="k">Original category</div><div>${it.original_category}</div>
+        <div class="k">Category / group</div><div>${it.category_group}</div>
+        <div class="k">Source key</div><div>${it.source_key}</div>
+        <div class="k">Hash</div><div>${it.content_md5}</div>
+        <div class="k">Leakage</div><div>${it.leakage_status}</div>
+        <div class="k">HUMAN_VERIFIED</div><div>${mine.manual_verdict==="DISTRESS"||mine.manual_verdict==="NORMAL" ? "true" : "false"}</div>
+        <div class="k">Notes from inventory</div><div>${it.notes||""}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="verdicts">
+        <button class="v ${mine.manual_verdict==="DISTRESS"?"on":""}" data-v="DISTRESS">DISTRESS<small>Emergency help / scream / call for help</small></button>
+        <button class="v ${mine.manual_verdict==="NORMAL"?"on":""}" data-v="NORMAL">NORMAL<small>Hard-negative: laugh, talk, traffic, non-distress shout</small></button>
+        <button class="v ${mine.manual_verdict==="UNCERTAIN"?"on":""}" data-v="UNCERTAIN">UNCERTAIN<small>Skip official scoring</small></button>
+      </div>
+      <p class="muted">Keys: <kbd>1</kbd> DISTRESS · <kbd>2</kbd> NORMAL · <kbd>3</kbd> UNCERTAIN · <kbd>N</kbd> next</p>
+      <textarea id="notes" placeholder="optional notes">${mine.notes||""}</textarea>
+    </div>`;
+  [...$("detail").querySelectorAll(".v")].forEach(btn => btn.onclick = () => save(btn.dataset.v));
+}
+async function save(verdict){
+  const rid = $("reviewer").value.trim() || "reviewer";
+  const notes = ($("notes")||{}).value || "";
+  const r = await fetch("/api/verdict", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({gold_id:selected, reviewer_id:rid, manual_verdict:verdict, notes})});
+  const data = await r.json();
+  if(!data.ok){ alert(data.error||"save failed"); return; }
+  verdicts[selected] = {manual_verdict:verdict, notes};
+  const vis = visible();
+  const idx = vis.findIndex(x => x.gold_id===selected);
+  await load();
+  if(vis[idx+1]) show(vis[idx+1].gold_id);
+}
+$("reload").onclick = load;
+$("filter").onchange = () => { renderList(); };
+document.addEventListener("keydown", e => {
+  if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA") return;
+  if(e.key==="1") save("DISTRESS");
+  if(e.key==="2") save("NORMAL");
+  if(e.key==="3") save("UNCERTAIN");
+  if(e.key==="n"||e.key==="N"){
+    const vis = visible();
+    const idx = vis.findIndex(x => x.gold_id===selected);
+    if(vis[idx+1]) show(vis[idx+1].gold_id);
+  }
+});
+load();
+</script>
+</body>
+</html>

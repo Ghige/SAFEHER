@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 from datetime import datetime
 import logging
@@ -11,6 +12,8 @@ from app.services.firebase_service import push_location_update, set_alert_status
 from app.services.alert_constants import ONGOING_ALERT_STATUSES
 from app.services.helper_service import find_and_notify_helpers
 from app.services.redis_service import delete_ping
+from app.services.audit_log import write_audit_event
+from app.observability import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +32,24 @@ def trigger_alert(
     3. Pushes location to Firebase for live tracking
     4. Notifies nearby helpers
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    # Serialize concurrent triggers for the same user (race-safe with unique index).
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .with_for_update()
+        .first()
+    )
     if not user:
         logger.warning(
             "trigger_alert rejected: user_id=%s reason=user_not_found trigger_type=%s",
             user_id,
             trigger_type,
+        )
+        metrics.incr("sos_trigger_rejected_total")
+        write_audit_event(
+            "sos_lifecycle",
+            actor_id=str(user_id),
+            detail={"phase": "rejected", "reason": "user_not_found", "trigger_type": trigger_type},
         )
         raise ValueError("User not found")
 
@@ -47,6 +62,17 @@ def trigger_alert(
             existing.id,
             existing.status,
             trigger_type,
+        )
+        metrics.incr("sos_trigger_rejected_total")
+        write_audit_event(
+            "sos_lifecycle",
+            actor_id=str(user_id),
+            detail={
+                "phase": "rejected",
+                "reason": "active_alert_exists",
+                "trigger_type": trigger_type,
+                "existing_alert_id": str(existing.id),
+            },
         )
         raise ValueError("An active alert already exists")
 
@@ -64,6 +90,16 @@ def trigger_alert(
             user_id,
             trigger_type,
         )
+        metrics.incr("sos_trigger_rejected_total")
+        write_audit_event(
+            "sos_lifecycle",
+            actor_id=str(user_id),
+            detail={
+                "phase": "rejected",
+                "reason": "no_emergency_contacts",
+                "trigger_type": trigger_type,
+            },
+        )
         raise ValueError("Add at least one emergency contact before triggering SOS")
 
     # Create alert record
@@ -75,8 +111,31 @@ def trigger_alert(
         status="active"
     )
     db.add(alert)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        logger.warning(
+            "trigger_alert integrity conflict user_id=%s trigger_type=%s err=%s",
+            user_id,
+            trigger_type,
+            exc.orig if hasattr(exc, "orig") else exc,
+        )
+        raise ValueError("An active alert already exists") from exc
     db.refresh(alert)
+
+    write_audit_event(
+        "sos_lifecycle",
+        actor_id=str(user_id),
+        detail={
+            "phase": "created",
+            "alert_id": str(alert.id),
+            "trigger_type": trigger_type,
+            "has_coords": latitude is not None and longitude is not None,
+            "contact_count": contact_count,
+        },
+    )
+    metrics.incr("sos_trigger_created_total")
 
     # Generate signed tracking token for WhatsApp links
     from app.api.v1.location import create_track_token
@@ -116,8 +175,22 @@ def trigger_alert(
         "whatsapp_all_delivered": failed_count == 0 and sent_count > 0,
     }
 
-    # Push to Firebase for live tracking
-    if latitude and longitude:
+    write_audit_event(
+        "sos_delivery_status",
+        actor_id=str(user_id),
+        detail={
+            "alert_id": str(alert.id),
+            "trigger_type": trigger_type,
+            "whatsapp_sent_count": sent_count,
+            "whatsapp_failed_count": failed_count,
+            "whatsapp_all_delivered": notification_status["whatsapp_all_delivered"],
+        },
+    )
+    metrics.incr("sos_whatsapp_sent_total", sent_count)
+    metrics.incr("sos_whatsapp_failed_total", failed_count)
+
+    # Push to Firebase for live tracking (explicit None checks — 0.0 is valid)
+    if latitude is not None and longitude is not None:
         push_location_update(
             alert_id=str(alert.id),
             latitude=latitude,
@@ -126,7 +199,7 @@ def trigger_alert(
         )
 
     # Find and notify nearby helpers
-    if latitude and longitude:
+    if latitude is not None and longitude is not None:
         find_and_notify_helpers(
             db=db,
             alert_id=str(alert.id),
@@ -136,8 +209,12 @@ def trigger_alert(
         )
 
     logger.info(
-        f"Alert {alert.id} triggered for user {user_id} via {trigger_type} "
-        f"(whatsapp sent={sent_count}, failed={failed_count})"
+        "Alert %s triggered for user %s via %s (whatsapp sent=%s, failed=%s)",
+        alert.id,
+        user_id,
+        trigger_type,
+        sent_count,
+        failed_count,
     )
     return alert, notification_status
 
@@ -167,8 +244,25 @@ def cancel_alert(db: Session, alert_id: UUID, user_id: UUID) -> Alert:
         EmergencyContact.is_active == True
     ).all()
     user_name = user.name if user else "User"
+    cancel_sent = 0
+    cancel_failed = 0
     for contact in contacts:
-        send_cancellation_message(contact.phone_number, user_name)
+        if send_cancellation_message(contact.phone_number, user_name):
+            cancel_sent += 1
+        else:
+            cancel_failed += 1
+
+    write_audit_event(
+        "sos_lifecycle",
+        actor_id=str(user_id),
+        detail={
+            "phase": "cancelled",
+            "alert_id": str(alert_id),
+            "cancel_whatsapp_sent": cancel_sent,
+            "cancel_whatsapp_failed": cancel_failed,
+        },
+    )
+    metrics.incr("sos_cancelled_total")
 
     return alert
 

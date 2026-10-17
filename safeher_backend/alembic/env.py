@@ -7,6 +7,7 @@ from app.config import settings
 
 # Import all models so Alembic detects them
 from app.models import user, contact, alert, helper, blocklist  # noqa
+from app.models import ai_dataset, ai_feedback  # noqa
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

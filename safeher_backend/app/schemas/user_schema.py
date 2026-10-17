@@ -4,19 +4,31 @@ from typing import Optional
 import re
 
 
+def _normalize_phone(v: str) -> str:
+    v = v.strip().replace(" ", "").replace("-", "")
+    if not re.match(r"^\+?[0-9]{10,15}$", v):
+        raise ValueError("Invalid phone number")
+    return v
+
+
 class UserRegister(BaseModel):
     phone_number: str
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     password: str
-    city: Optional[str] = None
+    city: Optional[str] = Field(None, max_length=100)
 
     @field_validator("phone_number")
     @classmethod
     def validate_phone(cls, v):
-        v = v.strip().replace(" ", "")
-        if not re.match(r"^\+?[0-9]{10,15}$", v):
-            raise ValueError("Invalid phone number")
-        return v
+        return _normalize_phone(v)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        name = v.strip()
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
     @field_validator("password")
     @classmethod
@@ -30,10 +42,36 @@ class UserLogin(BaseModel):
     phone_number: str
     password: str
 
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v):
+        return _normalize_phone(v)
+
+
+class OTPSend(BaseModel):
+    phone_number: str
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v):
+        return _normalize_phone(v)
+
 
 class OTPVerify(BaseModel):
     phone_number: str
-    otp: str
+    otp: str = Field(..., min_length=6, max_length=6)
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v):
+        return _normalize_phone(v)
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, v: str) -> str:
+        if not v.isdigit() or len(v) != 6:
+            raise ValueError("OTP must be exactly 6 digits")
+        return v
 
 
 class TokenRefresh(BaseModel):
@@ -56,18 +94,23 @@ class UserProfile(BaseModel):
 
 
 class ContactCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     phone_number: str
-    relationship: Optional[str] = None
-    ring_priority: int = 1
+    relationship: Optional[str] = Field(None, max_length=50)
+    ring_priority: int = Field(1, ge=1, le=5)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        name = v.strip()
+        if not name:
+            raise ValueError("Name is required")
+        return name
 
     @field_validator("phone_number")
     @classmethod
     def validate_phone(cls, v):
-        v = v.strip().replace(" ", "").replace("-", "")
-        if not re.match(r"^\+?[0-9]{10,15}$", v):
-            raise ValueError("Invalid phone number")
-        return v
+        return _normalize_phone(v)
 
 
 class DeviceTokenUpdate(BaseModel):

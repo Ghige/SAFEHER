@@ -40,7 +40,11 @@ class LocationForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        if (intent == null) {
+            // System sticky restart — must call startForeground promptly or be killed.
+            return recoverAfterStickyRestart()
+        }
+        when (intent.action) {
             ACTION_STOP -> {
                 stopTrackingInternal()
                 return START_NOT_STICKY
@@ -71,6 +75,27 @@ class LocationForegroundService : Service() {
                 startTrackingLoop(id)
             }
         }
+        return START_STICKY
+    }
+
+    private fun recoverAfterStickyRestart(): Int {
+        Timber.w("LocationForegroundService restarted with null intent — recovering")
+        try {
+            startForegroundWithLocationType()
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to re-enter foreground after sticky restart")
+            locationTrackingService.onServiceStopped()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        val id = locationTrackingService.activeAlertId.value
+            ?: alertSessionManager.activeAlert.value?.takeIf { it.isOngoing }?.id
+        if (id.isNullOrBlank() || !permissionManager.hasLocationPermission()) {
+            stopTrackingInternal()
+            return START_NOT_STICKY
+        }
+        alertId = id
+        startTrackingLoop(id)
         return START_STICKY
     }
 

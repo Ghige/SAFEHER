@@ -1,0 +1,71 @@
+{
+  "DEMO_MODE": true,
+  "description": "SafeHer Safety Decision Engine — TEST/DEMO configuration. Change thresholds here without editing engine code.",
+  "models": {
+    "audio_v4_exp02": {
+      "dir": "data/models/audio_v4_exp02",
+      "artifact": "audio_distress_classifier.keras",
+      "score_range": [0.0, 1.0],
+      "positive_label": "DISTRESS"
+    },
+    "speech_v2": {
+      "dir": "data/models/speech_v2",
+      "artifact": "speech_binary_model.joblib",
+      "scaler": "scaler.joblib",
+      "score_range": [0.0, 1.0],
+      "positive_label": "EMERGENCY"
+    },
+    "movement_v2": {
+      "dir": "../safeher_backend/app/ai/movement_model/data/models/movement_v2",
+      "artifact": "movement_model.joblib",
+      "scaler": "scaler.joblib",
+      "score_range": [0.0, 1.0],
+      "positive_label": "ABNORMAL",
+      "note": "Load only; do not retrain or overwrite."
+    }
+  },
+  "thresholds": {
+    "audio_distress": 0.55,
+    "audio_distress_high": 0.70,
+    "speech_emergency": 0.55,
+    "speech_emergency_high": 0.75,
+    "movement_abnormal": 0.60,
+    "movement_abnormal_high": 0.80,
+    "phrase_confidence_high": 0.75,
+    "note": "Aligned to Stage-3 decision_contract.json / backend fusion gates. Not model-training thresholds."
+  },
+  "emergency_phrases": [
+    "help me",
+    "i need help",
+    "mujhe bachao",
+    "madat karo"
+  ],
+  "rules": {
+    "unified_contract": true,
+    "phrase_alone_can_emergency": false,
+    "require_phrase_high_confidence_for_alone": true,
+    "audio_alone_can_emergency": false,
+    "audio_alone_is_suspicious": true,
+    "movement_alone_can_emergency": false,
+    "movement_alone_is_suspicious": true,
+    "multi_signal_is_emergency": true,
+    "note": "Rule evaluation is delegated to unified_engine (backend-aligned)."
+  },
+  "confirmation": {
+    "enabled": true,
+    "countdown_seconds": 30,
+    "message": "Possible emergency detected",
+    "cancel_action": "CANCELLED",
+    "no_response_action": "TEST_SOS_TRIGGERED",
+    "note": "Matches decision_contract confirmation.countdown_seconds and action confirm_30s"
+  },
+  "safety": {
+    "allow_real_sos": false,
+    "allow_phone_calls": false,
+    "allow_sms": false,
+    "allow_whatsapp": false,
+    "allow_emergency_contact_notifications": false,
+    "refuse_real_actions_while_demo_mode": true
+  },
+  "contract_path": "decision_contract.json"
+}

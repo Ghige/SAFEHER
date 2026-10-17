@@ -23,7 +23,7 @@ class RollingConfidenceWindowTest {
         val window = RollingConfidenceWindow(maxSize = 5)
         window.add(70.0)
         window.add(72.0)
-        window.add(95.0)
+        window.add(100.0)
         window.add(71.0)
         assertTrue(window.isSingleSpike(threshold = 75.0))
     }

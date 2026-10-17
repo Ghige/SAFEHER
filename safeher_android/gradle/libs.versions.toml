@@ -23,7 +23,7 @@ playServicesLocation = "21.3.0"
 playServicesMaps = "19.0.0"
 mapsCompose = "6.2.1"
 timber = "5.0.1"
-tensorflowLite = "2.14.0"
+tensorflowLite = "2.16.1"
 googleServices = "4.4.2"
 firebaseCrashlyticsGradle = "3.0.3"
 firebaseBom = "33.7.0"
@@ -81,6 +81,7 @@ play-services-maps = { group = "com.google.android.gms", name = "play-services-m
 maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-select-tf-ops = { group = "org.tensorflow", name = "tensorflow-lite-select-tf-ops", version.ref = "tensorflowLite" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }

@@ -84,7 +84,7 @@ def test_trigger_cancel_active_history_flow():
         headers=headers,
         json={"trigger_type": "manual", "latitude": 19.0, "longitude": 72.0},
     )
-    assert dup.status_code == 400
+    assert dup.status_code == 409
 
     ping = client.post(f"/api/v1/alerts/ping/{alert_id}", headers=headers)
     assert ping.status_code == 200

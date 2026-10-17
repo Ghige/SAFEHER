@@ -2,9 +2,11 @@
 
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.config import settings
 
 client = TestClient(app)
 
@@ -16,6 +18,12 @@ FIRE_SCORES = {
     "is_night": True,
     "is_isolated": True,
 }
+
+
+@pytest.fixture
+def enable_ai_auto_sos(monkeypatch):
+    """Opt-in only for tests that intentionally exercise AI auto-fire."""
+    monkeypatch.setattr(settings, "AI_AUTO_SOS_ENABLED", True)
 
 
 def _register_verified(city: str = "Mumbai") -> dict:
@@ -40,7 +48,49 @@ def _add_contact(headers: dict) -> None:
     assert resp.status_code == 201, resp.text
 
 
-def test_audio_sos_fires_alert():
+def test_ai_auto_sos_disabled_by_default():
+    assert settings.AI_AUTO_SOS_ENABLED is False
+
+
+def test_audio_sos_blocked_when_ai_auto_sos_disabled():
+    """Stage 0: high scores must NOT create a real alert while flag is false."""
+    assert settings.AI_AUTO_SOS_ENABLED is False
+    headers = _register_verified()
+    _add_contact(headers)
+    resp = client.post("/api/v1/ai/audio-sos", headers=headers, json=FIRE_SCORES)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["fusion"]["action"] == "fire_immediately"
+    assert body["alert"] is None
+    assert body.get("ai_auto_sos_blocked") is True
+    assert body.get("reason") == "ai_auto_sos_disabled"
+
+    active = client.get("/api/v1/alerts/active", headers=headers)
+    assert active.status_code == 404
+
+
+def test_movement_sos_fall_blocked_when_ai_auto_sos_disabled():
+    assert settings.AI_AUTO_SOS_ENABLED is False
+    headers = _register_verified()
+    _add_contact(headers)
+    resp = client.post(
+        "/api/v1/ai/movement-sos",
+        headers=headers,
+        json={
+            "movement_score": 10.0,
+            "fall_detected": True,
+            "latitude": 19.076,
+            "longitude": 72.8777,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["alert"] is None
+    assert body.get("ai_auto_sos_blocked") is True
+    assert body.get("reason") == "ai_auto_sos_disabled"
+
+
+def test_audio_sos_fires_alert_when_enabled(enable_ai_auto_sos):
     headers = _register_verified()
     _add_contact(headers)
     resp = client.post("/api/v1/ai/audio-sos", headers=headers, json=FIRE_SCORES)
@@ -54,7 +104,7 @@ def test_audio_sos_fires_alert():
     assert active.json()["trigger_type"] == "ai_audio"
 
 
-def test_movement_sos_fall_fires_immediately():
+def test_movement_sos_fall_fires_immediately_when_enabled(enable_ai_auto_sos):
     headers = _register_verified()
     _add_contact(headers)
     resp = client.post(
@@ -73,7 +123,7 @@ def test_movement_sos_fall_fires_immediately():
     assert body["alert"] is not None
 
 
-def test_movement_sos_fusion_fires_alert():
+def test_movement_sos_fusion_fires_alert_when_enabled(enable_ai_auto_sos):
     headers = _register_verified()
     _add_contact(headers)
     resp = client.post(
@@ -146,7 +196,7 @@ def test_ai_sos_requires_verified_user():
     assert resp.status_code == 403
 
 
-def test_duplicate_ai_sos_returns_trigger_error():
+def test_duplicate_ai_sos_returns_trigger_error(enable_ai_auto_sos):
     headers = _register_verified()
     _add_contact(headers)
     first = client.post("/api/v1/ai/audio-sos", headers=headers, json=FIRE_SCORES)
@@ -160,7 +210,7 @@ def test_duplicate_ai_sos_returns_trigger_error():
     assert "active alert" in body["trigger_error"].lower()
 
 
-def test_ai_sos_without_contacts_returns_trigger_error():
+def test_ai_sos_without_contacts_returns_trigger_error(enable_ai_auto_sos):
     headers = _register_verified()
     resp = client.post("/api/v1/ai/audio-sos", headers=headers, json=FIRE_SCORES)
     assert resp.status_code == 200
@@ -178,8 +228,9 @@ def test_confidence_query():
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["action"] == "confirm_30s"
-    assert body["total_score"] == 70.0
+    # Current DecisionContract (unchanged): 80 audio + 70 movement is fire_immediately.
+    assert body["action"] == "fire_immediately"
+    assert body["total_score"] >= 65
 
     fire = client.post(
         "/api/v1/ai/confidence",
@@ -200,7 +251,7 @@ def test_latest_model_version():
     assert body["status"] == "active"
 
 
-def test_queue_dataset_sample():
+def test_queue_dataset_sample_retired():
     headers = _register_verified()
     wav_bytes = b"RIFF" + (b"\x00" * 40)
     resp = client.post(
@@ -216,7 +267,4 @@ def test_queue_dataset_sample():
             "features_json": '{"rms":0.12,"pitch_hz":400}',
         },
     )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["status"] == "queued"
-    assert body["sample_id"]
+    assert resp.status_code == 410

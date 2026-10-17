@@ -50,12 +50,19 @@ def trigger(
 ):
     """Fire an alert — sends WhatsApp to contacts + notifies helpers."""
     logger.info(
-        "POST %s user_id=%s trigger_type=%s latitude=%s longitude=%s",
+        "POST %s user_id=%s trigger_type=%s has_coords=%s",
         _TRIGGER_PATH,
         current_user.id,
         payload.trigger_type,
-        payload.latitude,
-        payload.longitude,
+        payload.latitude is not None and payload.longitude is not None,
+    )
+    from app.services.audit_log import write_audit_event
+
+    write_audit_event(
+        "manual_alert_trigger_attempt",
+        actor_id=str(current_user.id),
+        request_id=getattr(request.state, "request_id", None),
+        detail={"trigger_type": payload.trigger_type, "has_coords": payload.latitude is not None},
     )
     _rate_limit_alert(request, str(current_user.id))
     try:
@@ -71,19 +78,16 @@ def trigger(
         )
     except ValueError as e:
         detail = str(e)
+        status_code = 409 if "already exists" in detail.lower() else 400
         logger.warning(
-            "POST %s rejected user_id=%s detail=%r",
+            "POST %s rejected user_id=%s status=%s detail=%r",
             _TRIGGER_PATH,
             current_user.id,
+            status_code,
             detail,
             exc_info=True,
         )
-        logger.warning(
-            "POST %s returning HTTP 400 detail=%r",
-            _TRIGGER_PATH,
-            detail,
-        )
-        raise HTTPException(status_code=400, detail=detail) from e
+        raise HTTPException(status_code=status_code, detail=detail) from e
     except HTTPException:
         raise
     except Exception:
@@ -93,7 +97,7 @@ def trigger(
             current_user.id,
             payload.trigger_type,
         )
-        raise
+        raise HTTPException(status_code=500, detail="Failed to trigger alert. Please try again.") from None
 
 
 @router.post("/cancel/{alert_id}", response_model=AlertResponse)

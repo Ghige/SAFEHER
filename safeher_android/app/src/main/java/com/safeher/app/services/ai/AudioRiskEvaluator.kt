@@ -16,16 +16,27 @@ data class AudioRiskAssessment(
     val sustainedConfidence: Boolean,
     val impulsiveNoise: Boolean,
     val features: AudioFrameFeatures,
+    val phraseScore: Double = 0.0,
+    val phraseDetected: Boolean = false,
 ) {
+    /**
+     * Backend / SDE query when HIGH from sustained distress OR strong emergency phrase.
+     * Volume alone never qualifies.
+     */
     val shouldQueryBackend: Boolean
-        get() = riskLevel == AudioRiskLevel.HIGH &&
-            sustainedConfidence &&
-            !impulsiveNoise
+        get() = !impulsiveNoise && (
+            (riskLevel == AudioRiskLevel.HIGH && sustainedConfidence) ||
+                (phraseDetected && phraseScore >= 0.75) ||
+                (riskLevel == AudioRiskLevel.HIGH && phraseDetected)
+            )
 }
 
 /**
- * Combines model confidence, acoustic features, and temporal smoothing into a risk level.
- * Never marks HIGH from a single raw prediction alone.
+ * Combines model confidence, optional phrase score, acoustic features, and temporal
+ * smoothing into a risk level.
+ *
+ * Volume/RMS is a supporting feature only — never sole HIGH/SOS trigger.
+ * Quiet emergency phrases can escalate via [phraseScore] without a volume spike.
  */
 object AudioRiskEvaluator {
 
@@ -38,6 +49,7 @@ object AudioRiskEvaluator {
         baselineRms: Double,
         baselineCentroid: Double,
         isSingleSpike: Boolean,
+        phraseScore: Double = 0.0,
     ): AudioRiskAssessment {
         val volumeSpike = features.rmsEnergy >= config.absoluteVolumeSpikeRms ||
             (baselineRms > 0.01 && features.rmsEnergy >= baselineRms * config.volumeSpikeMultiplier)
@@ -53,17 +65,23 @@ object AudioRiskEvaluator {
         val impulsiveNoise = features.zeroCrossingRate >= config.impulsiveZcrThreshold &&
             durationSeconds < config.impulsiveMaxDurationSeconds
 
-        val signalCount = listOf(
-            rollingAverage >= config.confidenceThreshold,
-            volumeSpike,
-            frequencyAbnormal,
-            durationSeconds >= config.minimumDurationSeconds,
-        ).count { it }
+        val phraseDetected = phraseScore >= config.phraseScoreMedium
+        val strongPhrase = phraseScore >= config.phraseScoreHigh
+        val distressSignal = rollingAverage >= config.confidenceThreshold
 
+        // Volume is NOT required for HIGH. Sustained distress model OR phrase+distress.
         val riskLevel = when {
-            impulsiveNoise -> AudioRiskLevel.LOW
-            sustainedConfidence && signalCount >= 3 -> AudioRiskLevel.HIGH
-            signalCount >= 2 && rollingAverage >= config.confidenceThreshold * 0.85 -> AudioRiskLevel.MEDIUM
+            impulsiveNoise && !strongPhrase -> AudioRiskLevel.LOW
+            // Quiet "help me" with high phrase confidence
+            strongPhrase && rollingAverage < config.confidenceThreshold * 0.5 ->
+                if (durationSeconds >= 1.0) AudioRiskLevel.MEDIUM else AudioRiskLevel.LOW
+            strongPhrase && distressSignal -> AudioRiskLevel.HIGH
+            sustainedConfidence -> AudioRiskLevel.HIGH
+            phraseDetected && rollingAverage >= config.confidenceThreshold * 0.85 -> AudioRiskLevel.MEDIUM
+            distressSignal && (frequencyAbnormal || volumeSpike) &&
+                durationSeconds >= config.minimumDurationSeconds * 0.6 -> AudioRiskLevel.MEDIUM
+            // Loud-only / single weak signals stay LOW
+            volumeSpike && !distressSignal && !phraseDetected -> AudioRiskLevel.LOW
             else -> AudioRiskLevel.LOW
         }
 
@@ -77,6 +95,8 @@ object AudioRiskEvaluator {
             sustainedConfidence = sustainedConfidence,
             impulsiveNoise = impulsiveNoise,
             features = features,
+            phraseScore = phraseScore,
+            phraseDetected = phraseDetected,
         )
     }
 }

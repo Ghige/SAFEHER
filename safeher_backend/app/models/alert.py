@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, DECIMAL
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, DECIMAL, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -8,6 +8,15 @@ from app.db.database import Base
 
 class Alert(Base):
     __tablename__ = "alerts"
+    __table_args__ = (
+        # Enforced in DB via alembic 007 partial unique index.
+        Index(
+            "uq_alerts_one_ongoing_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('active', 'escalated')"),
+        ),
+    )
 
     id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id      = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)

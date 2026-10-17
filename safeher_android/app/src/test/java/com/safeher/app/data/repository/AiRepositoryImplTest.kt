@@ -106,4 +106,32 @@ class AiRepositoryImplTest {
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message?.contains("offline", ignoreCase = true) == true)
     }
+
+    @Test
+    fun submitFeedback_postsMetadataOnly() = runTest {
+        coEvery { api.submitFeedback(any()) } returns com.safeher.app.data.remote.dto.AiFeedbackResponseDto(
+            event_id = "11111111-1111-1111-1111-111111111111",
+            candidate_category = "AI_FALSE_POSITIVE_CANDIDATE",
+            review_status = "UNREVIEWED",
+            gold_eligible = false,
+            fp_fn_status = "HARD_NEGATIVE_CANDIDATE",
+        )
+
+        val result = repository.submitFeedback(
+            eventId = "11111111-1111-1111-1111-111111111111",
+            sessionId = "22222222-2222-2222-2222-222222222222",
+            modelVersion = "v1.0",
+            signalType = "audio",
+            predictionState = "EMERGENCY",
+            confidence = 90.0,
+            userFeedback = "CANCELLED",
+            outcome = "NO_ALERT",
+            consentGranted = true,
+            consentVersion = "privacy-v2-metadata-only",
+            featuresJson = """{"rms":0.1}""",
+        )
+
+        assertTrue(result.isSuccess)
+        coVerify { api.submitFeedback(any()) }
+    }
 }

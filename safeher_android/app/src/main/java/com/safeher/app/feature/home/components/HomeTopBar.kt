@@ -11,8 +11,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.safeher.app.R
 import com.safeher.app.core.designsystem.SafeHerIcons
 import com.safeher.app.core.designsystem.SafeHerTextSecondary
 
@@ -56,7 +58,7 @@ fun OfflineBanner(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text = "You are offline",
+        text = stringResource(R.string.error_offline_banner),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),

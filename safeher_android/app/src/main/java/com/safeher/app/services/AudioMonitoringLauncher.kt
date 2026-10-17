@@ -27,7 +27,9 @@ class AudioMonitoringLauncher @Inject constructor(
         pendingStart = false
         _isRunning.value = true
         if (!startForegroundService(AudioMonitorService.createStartIntent(context))) {
+            // Mirror LocationTrackingService: clear running so flushPendingStart can retry.
             pendingStart = true
+            _isRunning.value = false
         }
     }
 
@@ -38,14 +40,29 @@ class AudioMonitoringLauncher @Inject constructor(
         stopRunningService()
     }
 
-    fun flushPendingStart() {
-        if (!pendingStart || _isRunning.value) return
-        pendingStart = false
-        _isRunning.value = true
-        if (!startForegroundService(AudioMonitorService.createStartIntent(context))) {
-            pendingStart = true
-            _isRunning.value = false
+    /** Brief mic release for duty-cycled ASR (FGS stays up). */
+    fun pauseMicCapture() {
+        if (!_isRunning.value) return
+        try {
+            context.startService(AudioMonitorService.createPauseMicIntent(context))
+        } catch (e: Exception) {
+            Timber.w(e, "pauseMicCapture failed")
         }
+    }
+
+    fun resumeMicCapture() {
+        if (!_isRunning.value) return
+        try {
+            context.startService(AudioMonitorService.createResumeMicIntent(context))
+        } catch (e: Exception) {
+            Timber.w(e, "resumeMicCapture failed")
+        }
+    }
+
+    fun flushPendingStart() {
+        if (!pendingStart) return
+        pendingStart = false
+        startMonitoring()
     }
 
     fun onServiceStopped() {
@@ -65,7 +82,6 @@ class AudioMonitoringLauncher @Inject constructor(
                 false
             } else {
                 Timber.e(e, "Failed to start audio monitor FGS")
-                _isRunning.value = false
                 false
             }
         }

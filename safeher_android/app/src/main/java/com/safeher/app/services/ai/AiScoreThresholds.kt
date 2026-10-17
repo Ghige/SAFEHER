@@ -1,27 +1,30 @@
 package com.safeher.app.services.ai
 
 /**
- * Score tiers aligned with backend [confidence_scorer.py].
+ * Score tiers aligned with Stage-3 [DecisionContract] / backend SDE.
  *
- * Android TFLite engines produce 0–100 sensor scores; fusion tiers are applied server-side.
- * Audio/movement contributions below [SENSOR_NOISE_FLOOR] are ignored by the backend scorer.
+ * Android TFLite engines produce 0–100 sensor scores; fusion is authoritative on backend.
  */
 object AiScoreThresholds {
-    /** Backend ignores audio/movement scores below this (noise floor). */
-    const val SENSOR_NOISE_FLOOR = 60
+    /** Backend / contract silent band (risk_score * 100). */
+    const val TIER_SILENT_VIBRATION = DecisionContract.TIER_SILENT_VIBRATION
 
-    /** Silent haptic only — low fused confidence. */
-    const val TIER_SILENT_VIBRATION = 40
+    /** MEDIUM risk ≈ confirm_30s / SUSPICIOUS. */
+    const val TIER_CONFIRM_30S = DecisionContract.TIER_CONFIRM
 
-    /** 30 s SOS countdown before auto-trigger. */
-    const val TIER_CONFIRM_30S = 60
+    /** HIGH risk ≈ fire_immediately / EMERGENCY. */
+    const val TIER_IMMEDIATE_SOS = DecisionContract.TIER_IMMEDIATE_SOS
 
-    /** Immediate SOS + live location stream. */
-    const val TIER_IMMEDIATE_SOS = 80
+    /** Distress gate medium (0.55 → 55). */
+    const val DISTRESS_MEDIUM = 55
 
-    /** High-confidence audio tier (backend _audio_contribution). */
-    const val AUDIO_TIER_HIGH = 75
+    /** Distress gate high (0.70 → 70). */
+    const val DISTRESS_HIGH = 70
 
-    /** Very high-confidence audio tier. */
-    const val AUDIO_TIER_CRITICAL = 90
+    /** AI confirmation countdown — matches DecisionContract / confirm_30s. */
+    const val CONFIRM_COUNTDOWN_SECONDS = DecisionContract.CONFIRM_COUNTDOWN_SECONDS
+
+    /** Legacy alias — do not treat as fusion fire threshold. */
+    @Deprecated("Use TIER_IMMEDIATE_SOS (65) — contract v1.0.0")
+    const val SENSOR_NOISE_FLOOR = 55
 }

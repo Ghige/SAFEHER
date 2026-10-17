@@ -27,9 +27,14 @@ data class MovementSosRequestDto(
 data class ConfidenceRequestDto(
     val audio_score: Float = 0f,
     val movement_score: Float = 0f,
+    val phrase_score: Float = 0f,
+    val volume_score: Float = 0f,
+    val detected_phrase: String? = null,
+    val phrase_language: String? = null,
     val heart_rate_spike: Boolean = false,
     val is_night: Boolean? = null,
     val is_isolated: Boolean = false,
+    val fall_detected: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)
@@ -42,6 +47,14 @@ data class AiConfidenceResponseDto(
     val heart_rate_spike: Boolean,
     val is_night: Boolean?,
     val is_isolated: Boolean,
+    val risk_level: String? = null,
+    val risk_score: Double? = null,
+    val reason_codes: List<String>? = null,
+    val phrase_score: Double? = null,
+    val detected_phrase: String? = null,
+    val phrase_language: String? = null,
+    val should_confirm: Boolean? = null,
+    val should_trigger_sos: Boolean? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -78,4 +91,28 @@ data class AiModelVersionDto(
 data class AiDatasetQueueResponseDto(
     val sample_id: String,
     val status: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class AiFeedbackRequestDto(
+    val event_id: String,
+    val session_id: String,
+    val model_version: String,
+    val signal_type: String,
+    val prediction_state: String,
+    val confidence: Double,
+    val user_feedback: String,
+    val outcome: String,
+    val consent_granted: Boolean,
+    val consent_version: String,
+    val features: Map<String, Double>? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AiFeedbackResponseDto(
+    val event_id: String,
+    val candidate_category: String,
+    val review_status: String,
+    val gold_eligible: Boolean = false,
+    val fp_fn_status: String? = null,
 )

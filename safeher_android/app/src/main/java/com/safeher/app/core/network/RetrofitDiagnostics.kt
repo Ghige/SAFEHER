@@ -30,14 +30,13 @@ object RetrofitDiagnostics {
     fun logFailure(tag: String, path: String, throwable: Throwable) {
         when (throwable) {
             is HttpException -> {
-                val errorBody = throwable.response()?.errorBody()?.string()
+                // Do not read errorBody() here — it can only be consumed once (ApiErrorParser needs it).
                 Timber.e(
                     throwable,
-                    "%s: <-- HttpException path=%s status=%d errorBody=%s",
+                    "%s: <-- HttpException path=%s status=%d",
                     tag,
                     path,
                     throwable.code(),
-                    errorBody,
                 )
             }
             else -> Timber.e(

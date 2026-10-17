@@ -23,18 +23,31 @@ class NetworkMonitor @Inject constructor(
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
+        fun emitCurrent() {
+            val online = connectivityManager.hasInternetCapability()
+            Timber.d(
+                "NetworkMonitor.emit: isOnline=%s capabilities=%s",
+                online,
+                connectivityManager.describeActiveNetwork(),
+            )
+            trySend(online)
+        }
+
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Timber.d(
-                    "NetworkMonitor.onAvailable: emitting isOnline=true (capabilities=%s)",
-                    connectivityManager.describeActiveNetwork(),
-                )
-                trySend(true)
+                // Wait for validated capabilities — onAvailable alone can be captive-portal.
+                emitCurrent()
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                networkCapabilities: NetworkCapabilities,
+            ) {
+                emitCurrent()
             }
 
             override fun onLost(network: Network) {
-                Timber.d("NetworkMonitor.onLost: emitting isOnline=false")
-                trySend(false)
+                emitCurrent()
             }
         }
 
@@ -43,13 +56,7 @@ class NetworkMonitor @Inject constructor(
             .build()
 
         connectivityManager.registerNetworkCallback(request, callback)
-        val initialOnline = connectivityManager.hasInternetCapability()
-        Timber.d(
-            "NetworkMonitor.initial: emitting isOnline=%s capabilities=%s",
-            initialOnline,
-            connectivityManager.describeActiveNetwork(),
-        )
-        trySend(initialOnline)
+        emitCurrent()
 
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }.distinctUntilChanged()

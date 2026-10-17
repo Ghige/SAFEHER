@@ -11,6 +11,11 @@ interface AiRepository {
         heartRateSpike: Boolean = false,
         isNight: Boolean? = null,
         isIsolated: Boolean = false,
+        phraseScore: Float = 0f,
+        volumeScore: Float = 0f,
+        detectedPhrase: String? = null,
+        phraseLanguage: String? = null,
+        fallDetected: Boolean = false,
     ): Result<AiConfidenceResult>
 
     suspend fun triggerAudioSos(
@@ -34,13 +39,17 @@ interface AiRepository {
 
     suspend fun getLatestModelVersion(modelType: String = "audio"): Result<String>
 
-    suspend fun queueDatasetSample(
-        audioWav: ByteArray,
+    suspend fun submitFeedback(
+        eventId: String,
+        sessionId: String,
         modelVersion: String,
-        aiConfidence: Float,
-        userConfirmation: Boolean,
-        label: String,
-        durationSeconds: Float,
+        signalType: String,
+        predictionState: String,
+        confidence: Double,
+        userFeedback: String,
+        outcome: String,
+        consentGranted: Boolean,
+        consentVersion: String,
         featuresJson: String,
     ): Result<Unit>
 }

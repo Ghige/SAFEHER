@@ -1,0 +1,96 @@
+{
+  "contract_version": "1.0.0",
+  "description": "Golden score vectors for Stage-3 SDE parity (Python unified / backend / Android). is_night=false, no HR/isolation.",
+  "vectors": [
+    {
+      "id": "normal",
+      "audio": 0.1,
+      "speech": 0.05,
+      "movement": 0.1,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "nothing",
+      "expected_state": "NORMAL"
+    },
+    {
+      "id": "audio_only_high_distress",
+      "audio": 0.86,
+      "speech": 0.0,
+      "movement": 0.1,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "fire_immediately",
+      "expected_state": "EMERGENCY"
+    },
+    {
+      "id": "movement_only",
+      "audio": 0.1,
+      "speech": 0.0,
+      "movement": 0.95,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "nothing",
+      "expected_state": "NORMAL"
+    },
+    {
+      "id": "emergency_speech_alone",
+      "audio": 0.1,
+      "speech": 0.92,
+      "movement": 0.1,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "confirm_30s",
+      "expected_state": "SUSPICIOUS"
+    },
+    {
+      "id": "audio_plus_movement",
+      "audio": 0.84,
+      "speech": 0.0,
+      "movement": 0.82,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "fire_immediately",
+      "expected_state": "EMERGENCY"
+    },
+    {
+      "id": "speech_plus_movement",
+      "audio": 0.2,
+      "speech": 0.9,
+      "movement": 0.85,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "fire_immediately",
+      "expected_state": "EMERGENCY"
+    },
+    {
+      "id": "all_signals",
+      "audio": 0.8,
+      "speech": 0.9,
+      "movement": 0.85,
+      "volume": 0.0,
+      "fall": false,
+      "expected_action": "fire_immediately",
+      "expected_state": "EMERGENCY"
+    },
+    {
+      "id": "fall",
+      "audio": 0.0,
+      "speech": 0.0,
+      "movement": 0.0,
+      "volume": 0.0,
+      "fall": true,
+      "expected_action": "fire_immediately",
+      "expected_state": "EMERGENCY"
+    },
+    {
+      "id": "volume_only",
+      "audio": 0.0,
+      "speech": 0.0,
+      "movement": 0.0,
+      "volume": 1.0,
+      "fall": false,
+      "expected_action": "nothing",
+      "expected_state": "NORMAL"
+    }
+  ]
+}

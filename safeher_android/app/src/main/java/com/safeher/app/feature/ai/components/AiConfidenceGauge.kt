@@ -108,20 +108,50 @@ fun AiMetricTile(
 
 @Composable
 fun AiEmergencyConfirmationCard(
+    promptKind: String,
+    secondsRemaining: Int,
     onConfirmSafe: () -> Unit,
     onConfirmSos: () -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
+    body: String? = null,
+    confirmLabel: String? = null,
+    dismissLabel: String? = null,
+    showCountdown: Boolean = true,
 ) {
+    val isEmergency = promptKind.equals("EMERGENCY", ignoreCase = true)
+    val resolvedTitle = title ?: stringResource(
+        if (isEmergency) R.string.ai_confirm_emergency_title
+        else R.string.ai_confirm_suspicious_title,
+    )
+    val resolvedBody = body ?: stringResource(
+        if (isEmergency) R.string.ai_confirm_emergency_body
+        else R.string.ai_confirm_suspicious_body,
+    )
+    val resolvedConfirm = confirmLabel ?: stringResource(R.string.ai_emergency_confirm_yes)
+    val resolvedDismiss = dismissLabel ?: stringResource(R.string.ai_emergency_confirm_no)
     SafeHerCard(modifier = modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = stringResource(R.string.ai_emergency_confirm_title),
+                text = resolvedTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = stringResource(R.string.ai_emergency_confirm_body),
+                text = resolvedBody,
                 style = MaterialTheme.typography.bodyMedium,
+                color = SafeHerTextSecondary,
+            )
+            if (showCountdown) {
+                Text(
+                    text = stringResource(R.string.ai_confirm_countdown, secondsRemaining),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = stringResource(R.string.ai_confirm_no_auto_sos),
+                style = MaterialTheme.typography.bodySmall,
                 color = SafeHerTextSecondary,
             )
             androidx.compose.foundation.layout.Row(
@@ -131,13 +161,13 @@ fun AiEmergencyConfirmationCard(
                     onClick = onConfirmSafe,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(stringResource(R.string.ai_emergency_confirm_no))
+                    Text(resolvedDismiss)
                 }
                 androidx.compose.material3.Button(
                     onClick = onConfirmSos,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(stringResource(R.string.ai_emergency_confirm_yes))
+                    Text(resolvedConfirm)
                 }
             }
         }

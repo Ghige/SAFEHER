@@ -4,6 +4,7 @@ import com.safeher.app.core.network.AiApi
 import com.safeher.app.core.network.NetworkMonitor
 import com.safeher.app.core.network.RepositoryApiCall
 import com.safeher.app.data.remote.dto.AiConfidenceResponseDto
+import com.safeher.app.data.remote.dto.AiFeedbackRequestDto
 import com.safeher.app.data.remote.dto.AiFusionDto
 import com.safeher.app.data.remote.dto.AiSosResponseDto
 import com.safeher.app.data.remote.dto.AudioSosRequestDto
@@ -15,9 +16,7 @@ import com.safeher.app.domain.model.AiSosResult
 import com.safeher.app.domain.repository.AiRepository
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.flow.first
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,14 +34,24 @@ class AiRepositoryImpl @Inject constructor(
         heartRateSpike: Boolean,
         isNight: Boolean?,
         isIsolated: Boolean,
+        phraseScore: Float,
+        volumeScore: Float,
+        detectedPhrase: String?,
+        phraseLanguage: String?,
+        fallDetected: Boolean,
     ): Result<AiConfidenceResult> = RepositoryApiCall.executeOnline(moshi, networkMonitor) {
         api.getConfidence(
             ConfidenceRequestDto(
                 audio_score = audioScore,
                 movement_score = movementScore,
+                phrase_score = phraseScore,
+                volume_score = volumeScore,
+                detected_phrase = detectedPhrase,
+                phrase_language = phraseLanguage,
                 heart_rate_spike = heartRateSpike,
                 is_night = isNight,
                 is_isolated = isIsolated,
+                fall_detected = fallDetected,
             ),
         ).toDomain()
     }
@@ -94,39 +103,60 @@ class AiRepositoryImpl @Inject constructor(
             api.getLatestModelVersion(modelType).version
         }
 
-    override suspend fun queueDatasetSample(
-        audioWav: ByteArray,
+    override suspend fun submitFeedback(
+        eventId: String,
+        sessionId: String,
         modelVersion: String,
-        aiConfidence: Float,
-        userConfirmation: Boolean,
-        label: String,
-        durationSeconds: Float,
+        signalType: String,
+        predictionState: String,
+        confidence: Double,
+        userFeedback: String,
+        outcome: String,
+        consentGranted: Boolean,
+        consentVersion: String,
         featuresJson: String,
     ): Result<Unit> = try {
         if (!networkMonitor.isOnline.first()) {
-            Result.failure(Exception("Offline — dataset upload skipped"))
+            Result.failure(Exception("Offline — feedback skipped"))
         } else {
-            val textType = "text/plain".toMediaType()
-            val audioPart = MultipartBody.Part.createFormData(
-                "audio",
-                "clip.wav",
-                audioWav.toRequestBody("audio/wav".toMediaType()),
+            api.submitFeedback(
+                AiFeedbackRequestDto(
+                    event_id = eventId,
+                    session_id = sessionId,
+                    model_version = modelVersion,
+                    signal_type = signalType,
+                    prediction_state = predictionState,
+                    confidence = confidence,
+                    user_feedback = userFeedback,
+                    outcome = outcome,
+                    consent_granted = consentGranted,
+                    consent_version = consentVersion,
+                    features = parseNumericFeatures(featuresJson),
+                ),
             )
-            api.queueDatasetSample(
-                audio = audioPart,
-                modelVersion = modelVersion.toRequestBody(textType),
-                aiConfidence = aiConfidence.toString().toRequestBody(textType),
-                userConfirmation = userConfirmation.toString().toRequestBody(textType),
-                label = label.toRequestBody(textType),
-                durationSeconds = durationSeconds.toString().toRequestBody(textType),
-                featuresJson = featuresJson.toRequestBody(textType),
-            )
-            Timber.i("AI dataset sample queued label=%s model=%s", label, modelVersion)
+            Timber.i("AI feedback recorded category-event=%s", eventId)
             Result.success(Unit)
         }
     } catch (e: Exception) {
-        Timber.w(e, "AI dataset upload failed")
+        Timber.w(e, "AI feedback upload failed")
         Result.failure(e)
+    }
+
+    private fun parseNumericFeatures(json: String): Map<String, Double>? {
+        if (json.isBlank()) return null
+        return try {
+            val obj = JSONObject(json)
+            val out = mutableMapOf<String, Double>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = obj.optDouble(key, Double.NaN)
+                if (!value.isNaN()) out[key] = value
+            }
+            out.ifEmpty { null }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun AiConfidenceResponseDto.toDomain() = AiConfidenceResult(

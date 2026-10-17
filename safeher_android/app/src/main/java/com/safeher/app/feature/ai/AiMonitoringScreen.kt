@@ -46,7 +46,6 @@ import com.safeher.app.core.designsystem.components.PinkWaveform
 import com.safeher.app.core.designsystem.components.SafeHerCard
 import com.safeher.app.core.designsystem.components.SafeHerStatusBadge
 import com.safeher.app.feature.ai.components.AiConfidenceGauge
-import com.safeher.app.feature.ai.components.AiEmergencyConfirmationCard
 import com.safeher.app.feature.ai.components.AiMetricTile
 import com.safeher.app.feature.ai.components.AiToggleCard
 import com.safeher.app.feature.ai.components.LoadingAi
@@ -249,13 +248,6 @@ fun AiMonitoringScreen(
                         label = stringResource(R.string.ai_metric_risk),
                         value = uiState.riskLevelLabel ?: stringResource(R.string.ai_unavailable),
                         modifier = Modifier.weight(1f),
-                    )
-                }
-
-                if (uiState.pendingEmergencyConfirmation) {
-                    AiEmergencyConfirmationCard(
-                        onConfirmSafe = { viewModel.onEmergencyConfirmation(false) },
-                        onConfirmSos = { viewModel.onEmergencyConfirmation(true) },
                     )
                 }
 

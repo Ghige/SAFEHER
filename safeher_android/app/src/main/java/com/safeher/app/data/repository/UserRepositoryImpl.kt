@@ -62,4 +62,18 @@ class UserRepositoryImpl @Inject constructor(
     override fun clearProfileCache() {
         cachedProfile = null
     }
+
+    override suspend fun deleteAccount(): Result<Unit> {
+        return try {
+            if (!networkMonitor.isOnline.first()) {
+                Result.failure(Exception("You are offline. Connect to the internet and try again."))
+            } else {
+                api.deleteAccount()
+                cacheMutex.withLock { cachedProfile = null }
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ApiErrorParser.parse(e, moshi)))
+        }
+    }
 }

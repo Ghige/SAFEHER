@@ -12,6 +12,7 @@ import com.safeher.app.feature.sos.util.SosPreflightResult
 import com.safeher.app.services.ApplicationCoroutineScope
 import com.safeher.app.services.BatteryOptimizationManager
 import com.safeher.app.services.LocationPermissionManager
+import com.safeher.app.services.SosTriggerScheduler
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -45,6 +46,7 @@ class SOSViewModelTest {
     private val locationPermissionManager: LocationPermissionManager = mockk(relaxed = true)
     private val batteryOptimizationManager: BatteryOptimizationManager = mockk(relaxed = true)
     private val applicationScope: ApplicationCoroutineScope = mockk(relaxed = true)
+    private val sosTriggerScheduler: SosTriggerScheduler = mockk(relaxed = true)
     private lateinit var viewModel: SOSViewModel
 
     private val activeAlertFlow = MutableStateFlow<SafetyAlert?>(null)
@@ -94,6 +96,7 @@ class SOSViewModelTest {
             locationPermissionManager,
             batteryOptimizationManager,
             applicationScope,
+            sosTriggerScheduler,
         )
     }
 
@@ -203,6 +206,19 @@ class SOSViewModelTest {
     }
 
     @Test
+    fun requestCancelActiveAlert_whenOffline_setsErrorWithoutDialog() = runTest(testDispatcher) {
+        every { networkMonitor.isOnline } returns flowOf(false)
+        createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        viewModel.requestCancelActiveAlert()
+
+        assertFalse(viewModel.uiState.value.showCancelDialog)
+        assertEquals(SOSViewModel.OFFLINE_CANCEL_MESSAGE, viewModel.uiState.value.error)
+        coVerify(exactly = 0) { alertRepository.cancelAlert(any()) }
+    }
+
+    @Test
     fun confirmCancelActiveAlert_success_clearsAlertAndNavigatesBack() = runTest(testDispatcher) {
         activeAlertFlow.value = sampleAlert
         coEvery { alertRepository.cancelAlert("alert-uuid-123") } returns Result.success(
@@ -219,6 +235,40 @@ class SOSViewModelTest {
             assertEquals(SOSEvent.NavigateBack, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun confirmCancelActiveAlert_usesUiStateIdWhenSessionNull() = runTest(testDispatcher) {
+        coEvery { alertRepository.triggerAlert(null, null) } returns Result.success(sampleAlert)
+        coEvery { alertRepository.cancelAlert("alert-uuid-123") } returns Result.success(
+            sampleAlert.copy(status = "cancelled", endedAt = "2026-08-02T10:05:00Z"),
+        )
+        createViewModel()
+        viewModel.triggerSos()
+        testScheduler.advanceUntilIdle()
+        assertEquals(sampleAlert, viewModel.uiState.value.activeAlert)
+        assertNull(activeAlertFlow.value)
+
+        viewModel.events.test {
+            viewModel.confirmCancelActiveAlert()
+            testScheduler.advanceUntilIdle()
+            coVerify { alertRepository.cancelAlert("alert-uuid-123") }
+            coVerify { alertSessionManager.clearActiveAlert() }
+            assertEquals(SOSEvent.NavigateBack, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun confirmCancelActiveAlert_withoutId_setsErrorAndDoesNotCallApi() = runTest(testDispatcher) {
+        createViewModel()
+        testScheduler.advanceUntilIdle()
+
+        viewModel.confirmCancelActiveAlert()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(SOSViewModel.MISSING_ALERT_ID_MESSAGE, viewModel.uiState.value.error)
+        coVerify(exactly = 0) { alertRepository.cancelAlert(any()) }
     }
 
     @Test

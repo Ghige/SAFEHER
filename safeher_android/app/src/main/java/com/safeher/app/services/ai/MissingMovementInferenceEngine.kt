@@ -5,20 +5,24 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Placeholder until [AiModelAssets.MOVEMENT_MODEL] and scaler are added to assets
- * and TensorFlow Lite dependencies are configured.
+ * Movement model unavailable on-device — does not invent scores.
+ *
+ * Backend artifact `movement_v2/movement_model.joblib` is scikit-learn, not TFLite.
+ * [AiModelAssets.MOVEMENT_MODEL] is not present in assets.
  */
 @Singleton
 class MissingMovementInferenceEngine @Inject constructor() : MovementInferenceEngine {
 
     override val isAvailable: Boolean = false
 
+    val unavailableReason: String = AiModelAssets.MOVEMENT_UNAVAILABLE_REASON
+
     init {
-        Timber.w(
-            "AI movement model missing — add ${AiModelAssets.MOVEMENT_MODEL} and " +
-                "${AiModelAssets.MOVEMENT_SCALER} to assets/ and implement TfliteMovementInferenceEngine",
-        )
+        Timber.w("AI movement: %s", unavailableReason)
     }
 
-    override suspend fun inferMovement(accelerometerWindow: FloatArray): MovementInferenceEngine.MovementResult? = null
+    override suspend fun inferMovement(accelerometerWindow: FloatArray): MovementInferenceEngine.MovementResult? {
+        AiDetectionLogger.logMovementSkipped(unavailableReason)
+        return null
+    }
 }

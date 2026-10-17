@@ -18,16 +18,22 @@ import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -115,10 +121,10 @@ private fun SettingsContent(
             )
             Button(
                 onClick = viewModel::logout,
-                enabled = !uiState.isLoggingOut,
+                enabled = !uiState.isLoggingOut && !uiState.isDeletingAccount,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) {
                 if (uiState.isLoggingOut) {
@@ -126,6 +132,50 @@ private fun SettingsContent(
                 } else {
                     Text(stringResource(R.string.logout))
                 }
+            }
+            var showDeleteConfirm by remember { mutableStateOf(false) }
+            OutlinedButton(
+                onClick = { showDeleteConfirm = true },
+                enabled = !uiState.isLoggingOut && !uiState.isDeletingAccount,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) {
+                if (uiState.isDeletingAccount) {
+                    CircularProgressIndicator(strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.settings_delete_account))
+                }
+            }
+            uiState.error?.let { err ->
+                Text(
+                    text = err,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            if (showDeleteConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirm = false },
+                    title = { Text(stringResource(R.string.settings_delete_account_confirm_title)) },
+                    text = { Text(stringResource(R.string.settings_delete_account_confirm_body)) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDeleteConfirm = false
+                                viewModel.deleteAccount()
+                            },
+                        ) {
+                            Text(stringResource(R.string.settings_delete_account_confirm))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirm = false }) {
+                            Text(stringResource(R.string.settings_delete_account_cancel))
+                        }
+                    },
+                )
             }
         }
 

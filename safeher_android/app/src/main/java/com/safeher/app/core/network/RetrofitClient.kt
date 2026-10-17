@@ -1,10 +1,10 @@
 package com.safeher.app.core.network
 
-import com.safeher.app.BuildConfig
 import com.squareup.moshi.Moshi
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,8 +16,10 @@ class RetrofitClient @Inject constructor(
 ) {
 
     val retrofit: Retrofit by lazy {
+        val baseUrl = DebugApiBaseUrl.resolve()
+        Timber.i("API base URL=%s emulator=%s", baseUrl, DebugApiBaseUrl.isEmulator())
         Retrofit.Builder()
-            .baseUrl(BuildConfig.BASE_URL)
+            .baseUrl(baseUrl)
             .client(okHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
@@ -43,6 +45,7 @@ fun buildOkHttpClient(
         .writeTimeout(RetrofitClient.WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .addInterceptor(authInterceptor)
         .addInterceptor(unauthorizedInterceptor)
+        .addInterceptor(ReleaseNetworkPolicyInterceptor(enforceHttps = !enableLogging))
 
     if (enableLogging) {
         val logging = okhttp3.logging.HttpLoggingInterceptor().apply {

@@ -71,6 +71,32 @@ fun AiStatusScreen(
                 },
             )
 
+            uiState.modelStatusSummary?.let { summary ->
+                StatusRow(
+                    label = stringResource(R.string.ai_status_runtime),
+                    value = summary,
+                )
+            }
+
+            uiState.localSdeState?.let { state ->
+                StatusRow(
+                    label = stringResource(R.string.ai_status_local_sde),
+                    value = stringResource(
+                        R.string.ai_status_local_sde_body,
+                        state,
+                        uiState.localSdeAction ?: "—",
+                        uiState.audioLatencyMs?.toString() ?: "—",
+                    ),
+                )
+            }
+
+            uiState.detectedPhrase?.let { phrase ->
+                StatusRow(
+                    label = stringResource(R.string.ai_status_phrase),
+                    value = phrase,
+                )
+            }
+
             StatusRow(
                 label = stringResource(R.string.ai_status_foreground),
                 value = if (uiState.isAppInForeground) {
@@ -123,12 +149,24 @@ fun AiStatusScreen(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = MaterialTheme.shapes.medium,
                 ) {
-                    Text(
-                        text = stringResource(R.string.ai_movement_coming_soon),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = stringResource(R.string.ai_movement_coming_soon),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (uiState.movementLevel > 0f) {
+                            Text(
+                                text = stringResource(
+                                    R.string.ai_movement_imu_level,
+                                    (uiState.movementLevel * 100).toInt(),
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
                 }
             }
 

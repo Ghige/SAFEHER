@@ -125,6 +125,21 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun deleteAccount_success_logsOutAndNavigates() = runTest {
+        coEvery { userRepository.deleteAccount() } returns Result.success(Unit)
+        viewModel = SettingsViewModel(settingsRepository, userRepository)
+
+        viewModel.events.test {
+            viewModel.deleteAccount()
+            assertEquals(SettingsEvent.NavigateToLogin, awaitItem())
+        }
+
+        coVerify { userRepository.deleteAccount() }
+        coVerify { settingsRepository.logout() }
+        assertFalse(viewModel.uiState.value.isDeletingAccount)
+    }
+
+    @Test
     fun refreshPermissions_updatesPermissionStatuses() = runTest {
         val updated = permissionStatuses.copy(microphone = PermissionDisplayStatus.GRANTED)
         every { settingsRepository.getPermissionStatuses() } returns updated andThen updated

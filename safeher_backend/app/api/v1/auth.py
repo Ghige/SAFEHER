@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user_schema import UserRegister, UserLogin, OTPVerify, TokenResponse
+from app.schemas.user_schema import UserRegister, UserLogin, OTPVerify, OTPSend, TokenResponse
 from app.config import settings
 from app.services import otp_service
 from app.services.redis_service import check_rate_limit
@@ -128,22 +128,34 @@ def login_for_access_token(
     return TokenResponse(access_token=token)
 
 
+def _rate_limit_otp_phone(phone_number: str) -> None:
+    """Per-phone OTP send limit (independent of IP auth bucket)."""
+    allowed = check_rate_limit(
+        identifier=f"otp:{phone_number}",
+        limit=settings.RATE_LIMIT_OTP_PER_PHONE_PER_MINUTE,
+        window_seconds=60,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many OTP requests for this number. Please wait before trying again.",
+        )
+
+
 @router.post("/send-otp")
 def send_otp(
-    payload: dict,
+    payload: OTPSend,
     request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Send OTP to a phone number for verification.
-    Rate limited to prevent SMS spam.
+    Rate limited by IP and per-phone to prevent SMS spam.
     """
     _rate_limit_auth(request)
-    phone_number = payload.get("phone_number", "")
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="phone_number required")
+    _rate_limit_otp_phone(payload.phone_number)
 
-    sent = otp_service.send_otp(phone_number)
+    sent = otp_service.send_otp(payload.phone_number)
     if not sent:
         raise HTTPException(status_code=500, detail="Failed to send OTP. Try again later.")
     return {"message": "OTP sent successfully"}
@@ -160,18 +172,19 @@ def verify_otp(
     """
     _rate_limit_auth(request)
 
-    if len(payload.otp) != 6 or not payload.otp.isdigit():
-        raise HTTPException(status_code=400, detail="Invalid OTP format")
-
     verified = otp_service.verify_otp(payload.phone_number, payload.otp)
     if not verified:
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid, expired, or too many OTP attempts. Request a new OTP.",
+        )
 
-    # Mark user as verified in DB
     user = db.query(User).filter(User.phone_number == payload.phone_number).first()
-    if user:
-        user.is_verified = True
-        db.commit()
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found for this phone number")
+
+    user.is_verified = True
+    db.commit()
 
     return {"message": "Phone number verified successfully"}
 

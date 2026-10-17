@@ -94,4 +94,24 @@ class UserRepositoryImplTest {
         assertEquals("Jane Doe", second.getOrNull()?.name)
         coVerify(exactly = 1) { api.getProfile() }
     }
+
+    @Test
+    fun deleteAccount_callsApiAndClearsCache() = runTest {
+        coEvery { api.getProfile() } returns UserProfileDto(
+            id = "uuid-1",
+            phone_number = "9876543210",
+            name = "Jane Doe",
+            city = "Mumbai",
+        )
+        coEvery { userPreferences.isPhoneVerified } returns flowOf(true)
+        coEvery { api.deleteAccount() } returns Unit
+
+        repository.getProfile()
+        val result = repository.deleteAccount()
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { api.deleteAccount() }
+        repository.getProfile()
+        coVerify(exactly = 2) { api.getProfile() }
+    }
 }

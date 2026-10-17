@@ -16,12 +16,14 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.safeher.app.MainActivity
 import com.safeher.app.R
+import com.safeher.app.services.ai.AiDetectionLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -40,10 +42,40 @@ class AudioMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        if (intent == null) {
+            Timber.w("AudioMonitorService restarted with null intent — recovering")
+            try {
+                startForegroundWithMicrophoneType()
+            } catch (e: Exception) {
+                audioMonitoringLauncher.onServiceStopped()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            if (!audioPermissionManager.hasRecordAudioPermission() ||
+                !audioMonitoringLauncher.isRunning.value
+            ) {
+                stopMonitoringInternal()
+                return START_NOT_STICKY
+            }
+            startMonitoringLoop()
+            return START_STICKY
+        }
+        when (intent.action) {
             ACTION_STOP -> {
                 stopMonitoringInternal()
                 return START_NOT_STICKY
+            }
+            ACTION_PAUSE_MIC -> {
+                pauseMicCapture()
+                return START_STICKY
+            }
+            ACTION_RESUME_MIC -> {
+                if (audioMonitoringLauncher.isRunning.value &&
+                    audioPermissionManager.hasRecordAudioPermission()
+                ) {
+                    startMonitoringLoop()
+                }
+                return START_STICKY
             }
             ACTION_START -> {
                 // Enter foreground before any validation/async work (FGS timeout rule).
@@ -68,6 +100,7 @@ class AudioMonitorService : Service() {
             stopMonitoringInternal()
             return
         }
+        if (monitorJob?.isActive == true) return
         monitorJob?.cancel()
         monitorJob = serviceScope.scope.launch {
             val bufferSize = AudioRecord.getMinBufferSize(
@@ -84,11 +117,17 @@ class AudioMonitorService : Service() {
                 bufferSize,
             )
             if (record.state != AudioRecord.STATE_INITIALIZED) {
+                Timber.e("AudioRecord failed to initialize")
                 stopMonitoringInternal()
                 return@launch
             }
             audioRecord = record
             record.startRecording()
+            Timber.d("AudioRecord started (continuous distress capture)")
+            AiDetectionLogger.liveCaptureResume(
+                resumeTs = System.currentTimeMillis(),
+                nextSequence = aiSensorState.nextWindowSequence(),
+            )
 
             val readBuffer = ShortArray(bufferSize)
             val inferenceWindow = ShortArray(INFERENCE_WINDOW_SAMPLES)
@@ -110,6 +149,22 @@ class AudioMonitorService : Service() {
                 delay(SAMPLE_INTERVAL_MS)
             }
         }
+    }
+
+    /** Release mic for a short ASR slot without tearing down the FGS notification. */
+    private fun pauseMicCapture() {
+        Timber.i("Pausing AudioRecord for ASR interleave slot")
+        monitorJob?.cancel()
+        monitorJob = null
+        audioRecord?.run {
+            try {
+                stop()
+            } catch (_: IllegalStateException) {
+            }
+            release()
+        }
+        audioRecord = null
+        aiSensorState.updateAudioLevel(0f)
     }
 
     private fun stopMonitoringInternal() {
@@ -183,6 +238,8 @@ class AudioMonitorService : Service() {
     companion object {
         private const val ACTION_START = "com.safeher.app.action.AI_AUDIO_START"
         private const val ACTION_STOP = "com.safeher.app.action.AI_AUDIO_STOP"
+        private const val ACTION_PAUSE_MIC = "com.safeher.app.action.AI_AUDIO_PAUSE_MIC"
+        private const val ACTION_RESUME_MIC = "com.safeher.app.action.AI_AUDIO_RESUME_MIC"
         private const val CHANNEL_ID = "safeher_ai_monitoring"
         private const val NOTIFICATION_ID = 2001
         private const val SAMPLE_RATE = 16_000
@@ -195,5 +252,11 @@ class AudioMonitorService : Service() {
 
         fun createStopIntent(context: Context): Intent =
             Intent(context, AudioMonitorService::class.java).setAction(ACTION_STOP)
+
+        fun createPauseMicIntent(context: Context): Intent =
+            Intent(context, AudioMonitorService::class.java).setAction(ACTION_PAUSE_MIC)
+
+        fun createResumeMicIntent(context: Context): Intent =
+            Intent(context, AudioMonitorService::class.java).setAction(ACTION_RESUME_MIC)
     }
 }

@@ -9,6 +9,7 @@ import com.safeher.app.data.remote.dto.SendOtpRequestDto
 import com.safeher.app.data.remote.dto.TokenResponseDto
 import com.safeher.app.data.remote.dto.UserProfileDto
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 
@@ -31,4 +32,7 @@ interface SafeHerApi {
 
     @POST("api/v1/users/device-token")
     suspend fun registerDeviceToken(@Body body: DeviceTokenRequestDto)
+
+    @DELETE("api/v1/users/me")
+    suspend fun deleteAccount()
 }

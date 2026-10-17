@@ -18,7 +18,9 @@ import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -93,9 +95,11 @@ fun SosPreflightChecklist(
                     onFix = when (item.check) {
                         SosPreflightCheck.LOCATION_PERMISSION,
                         SosPreflightCheck.BACKGROUND_LOCATION,
+                        SosPreflightCheck.NOTIFICATIONS,
                         -> onOpenAppSettings
                         SosPreflightCheck.GPS_ENABLED -> onOpenLocationSettings
                         SosPreflightCheck.BATTERY_OPTIMIZATION -> onOpenBatterySettings
+                        SosPreflightCheck.NETWORK -> onOpenAppSettings
                     },
                 )
             }
@@ -160,6 +164,8 @@ private fun titleForCheck(check: SosPreflightCheck): String = when (check) {
     SosPreflightCheck.GPS_ENABLED -> stringResource(R.string.sos_preflight_gps)
     SosPreflightCheck.BACKGROUND_LOCATION -> stringResource(R.string.sos_preflight_background)
     SosPreflightCheck.BATTERY_OPTIMIZATION -> stringResource(R.string.sos_preflight_battery)
+    SosPreflightCheck.NETWORK -> stringResource(R.string.sos_preflight_network)
+    SosPreflightCheck.NOTIFICATIONS -> stringResource(R.string.sos_preflight_notifications)
 }
 
 @Composable
@@ -168,6 +174,8 @@ private fun subtitleForCheck(check: SosPreflightCheck): String = when (check) {
     SosPreflightCheck.GPS_ENABLED -> stringResource(R.string.sos_preflight_gps_hint)
     SosPreflightCheck.BACKGROUND_LOCATION -> stringResource(R.string.sos_preflight_background_hint)
     SosPreflightCheck.BATTERY_OPTIMIZATION -> stringResource(R.string.sos_preflight_battery_hint)
+    SosPreflightCheck.NETWORK -> stringResource(R.string.sos_preflight_network_hint)
+    SosPreflightCheck.NOTIFICATIONS -> stringResource(R.string.sos_preflight_notifications_hint)
 }
 
 private fun iconForCheck(check: SosPreflightCheck): ImageVector = when (check) {
@@ -175,6 +183,8 @@ private fun iconForCheck(check: SosPreflightCheck): ImageVector = when (check) {
     SosPreflightCheck.GPS_ENABLED -> Icons.Default.MyLocation
     SosPreflightCheck.BACKGROUND_LOCATION -> Icons.Default.LocationOn
     SosPreflightCheck.BATTERY_OPTIMIZATION -> Icons.Default.BatteryAlert
+    SosPreflightCheck.NETWORK -> Icons.Default.WifiOff
+    SosPreflightCheck.NOTIFICATIONS -> Icons.Default.Notifications
 }
 
 @Composable

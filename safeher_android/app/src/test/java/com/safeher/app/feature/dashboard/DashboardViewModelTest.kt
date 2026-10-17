@@ -52,9 +52,9 @@ class DashboardViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { userRepository.observeNetworkStatus() } returns flowOf(true)
         every { settingsStore.aiAudioDetectionEnabled } returns flowOf(true)
-        every { aiMonitoringCoordinator.isMonitoring } returns flowOf(false)
-        every { aiMonitoringCoordinator.riskAssessment } returns flowOf(null)
-        every { locationTrackingService.isTracking } returns flowOf(false)
+        every { aiMonitoringCoordinator.isMonitoring } returns MutableStateFlow(false)
+        every { aiMonitoringCoordinator.riskAssessment } returns MutableStateFlow(null)
+        every { locationTrackingService.isTracking } returns MutableStateFlow(false)
         coEvery { contactsRepository.getContacts() } returns Result.success(emptyList())
     }
 

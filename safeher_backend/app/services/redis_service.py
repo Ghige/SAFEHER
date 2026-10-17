@@ -41,11 +41,21 @@ def _get_client():
     except Exception as e:
         _redis_available = False
         if not _redis_warned:
-            logger.warning(
-                "Redis unavailable (%s). Using in-memory fallback — "
-                "NOT suitable for production multi-worker deployments.",
-                e,
-            )
+            from app.config import settings
+            from app.security.production_guards import is_production_like
+
+            if is_production_like(settings) and settings.REQUIRE_REDIS_IN_PRODUCTION:
+                logger.error(
+                    "Redis unavailable in production/staging (%s). "
+                    "In-memory fallback is disabled for multi-worker safety.",
+                    e,
+                )
+            else:
+                logger.warning(
+                    "Redis unavailable (%s). Using in-memory fallback — "
+                    "NOT suitable for production multi-worker deployments.",
+                    e,
+                )
             _redis_warned = True
         return None
 
@@ -139,6 +149,16 @@ def check_rate_limit(identifier: str, limit: int, window_seconds: int = 60) -> b
             return False
 
     # In-memory fallback (simple, not multi-process safe)
+    from app.config import settings
+    from app.security.production_guards import is_production_like
+
+    if is_production_like(settings) and settings.REQUIRE_REDIS_IN_PRODUCTION:
+        logger.error(
+            "Rate limit denied: Redis required in production but unavailable (id=%s)",
+            identifier,
+        )
+        return False
+
     now = time.time()
     window_start = now - window_seconds
     store_key = f"_rl_{key}"

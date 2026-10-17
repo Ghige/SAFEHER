@@ -12,6 +12,7 @@ import com.safeher.app.feature.sos.util.SosPreflightChecker
 import com.safeher.app.services.ApplicationCoroutineScope
 import com.safeher.app.services.BatteryOptimizationManager
 import com.safeher.app.services.LocationPermissionManager
+import com.safeher.app.services.SosTriggerScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -36,6 +37,7 @@ class SOSViewModel @Inject constructor(
     private val locationPermissionManager: LocationPermissionManager,
     private val batteryOptimizationManager: BatteryOptimizationManager,
     private val applicationScope: ApplicationCoroutineScope,
+    private val sosTriggerScheduler: SosTriggerScheduler,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SOSUiState())
@@ -174,7 +176,16 @@ class SOSViewModel @Inject constructor(
     }
 
     fun requestCancelActiveAlert() {
-        _uiState.update { it.copy(showCancelDialog = true) }
+        if (_uiState.value.isOffline) {
+            _uiState.update {
+                it.copy(
+                    showCancelDialog = false,
+                    error = OFFLINE_CANCEL_MESSAGE,
+                )
+            }
+            return
+        }
+        _uiState.update { it.copy(showCancelDialog = true, error = null) }
     }
 
     fun dismissCancelDialog() {
@@ -182,7 +193,18 @@ class SOSViewModel @Inject constructor(
     }
 
     fun confirmCancelActiveAlert() {
-        val alertId = alertSessionManager.activeAlert.value?.id ?: return
+        val alertId = alertSessionManager.activeAlert.value?.id
+            ?: _uiState.value.activeAlert?.id
+        if (alertId.isNullOrBlank()) {
+            _uiState.update {
+                it.copy(
+                    showCancelDialog = false,
+                    isLoading = false,
+                    error = MISSING_ALERT_ID_MESSAGE,
+                )
+            }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, showCancelDialog = false) }
             val result = alertRepository.cancelAlert(alertId)
@@ -208,6 +230,10 @@ class SOSViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.isOnline.collect { online ->
                 _uiState.update { it.copy(isOffline = !online) }
+                if (online && _uiState.value.hasPendingSos) {
+                    Timber.d("SOSViewModel: online with pending SOS — scheduling flush")
+                    sosTriggerScheduler.scheduleFlush()
+                }
             }
         }
     }
@@ -263,5 +289,9 @@ class SOSViewModel @Inject constructor(
         const val COUNTDOWN_SECONDS = 5
         const val WHATSAPP_DELIVERY_WARNING =
             "Alert created but notifications may have failed."
+        const val OFFLINE_CANCEL_MESSAGE =
+            "You are offline. Connect to the internet to cancel this alert."
+        const val MISSING_ALERT_ID_MESSAGE =
+            "No active alert to cancel."
     }
 }

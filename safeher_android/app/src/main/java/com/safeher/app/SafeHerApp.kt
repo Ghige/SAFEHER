@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.safeher.app.core.firebase.FirebaseBootstrap
+import com.safeher.app.core.logging.CrashlyticsTree
 import com.safeher.app.core.session.AlertSessionManager
 import com.safeher.app.services.AiMonitoringCoordinator
 import com.safeher.app.services.ApplicationCoroutineScope
@@ -32,6 +33,8 @@ class SafeHerApp : Application(), Configuration.Provider {
         FirebaseBootstrap.initialize(this)
         if (BuildConfig.ENABLE_LOGGING) {
             Timber.plant(Timber.DebugTree())
+        } else {
+            Timber.plant(CrashlyticsTree())
         }
         notificationChannelManager.ensureChannelsCreated()
         fcmTokenRegistrar.registerCurrentToken()

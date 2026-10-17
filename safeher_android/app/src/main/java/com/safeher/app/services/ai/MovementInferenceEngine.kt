@@ -11,6 +11,7 @@ interface MovementInferenceEngine {
     val isAvailable: Boolean
 
     data class MovementResult(
+        /** Anomaly score 0–100 (same scale as audio TFLite). */
         val movementScore: Double,
         val fallDetected: Boolean,
     )

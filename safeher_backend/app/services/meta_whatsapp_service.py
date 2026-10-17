@@ -16,7 +16,6 @@ to your approved utility templates with {{1}}…{{4}} body placeholders.
 
 from __future__ import annotations
 
-import json
 import logging
 
 import httpx
@@ -101,7 +100,8 @@ def _build_template_payload(
 
 
 def _log_response_error(to_phone: str, log_context: str, response: httpx.Response) -> None:
-    response_body = response.text
+    from app.observability import phone_suffix
+
     error_code = None
     error_message = None
     try:
@@ -112,13 +112,12 @@ def _log_response_error(to_phone: str, log_context: str, response: httpx.Respons
         pass
 
     logger.error(
-        "WhatsApp send failed to %s (%s): status=%s error_code=%s error_message=%s response_body=%s",
-        to_phone,
+        "WhatsApp send failed phone_suffix=%s context=%s status=%s error_code=%s error_message=%s",
+        phone_suffix(to_phone),
         log_context,
         response.status_code,
         error_code,
         error_message,
-        response_body,
     )
 
 
@@ -130,10 +129,13 @@ def _send_template_message(
     body_parameters: list[str],
     log_context: str,
 ) -> bool:
+    from app.observability import metrics, phone_suffix
+
     if not settings.META_ACCESS_TOKEN or not settings.META_PHONE_NUMBER_ID:
         logger.error(
             "Meta WhatsApp not configured: META_ACCESS_TOKEN and META_PHONE_NUMBER_ID are required"
         )
+        metrics.incr("whatsapp_send_failed_total")
         return False
 
     payload = _build_template_payload(
@@ -143,18 +145,13 @@ def _send_template_message(
         body_parameters=body_parameters,
     )
     url = _messages_url()
-    recipient = payload["to"]
-
+    # Stage 11: never log full E.164, names, maps/track URLs, or raw payload
     logger.info(
-        "Meta WhatsApp request url=%s phone_number_id=%s waba_id=%s recipient=%s "
-        "template=%s context=%s payload=%s",
-        url,
-        settings.META_PHONE_NUMBER_ID,
-        settings.META_WABA_ID,
-        recipient,
+        "Meta WhatsApp request phone_suffix=%s template=%s context=%s body_param_count=%s",
+        phone_suffix(to_phone),
         template_name,
         log_context,
-        json.dumps(payload),
+        len(body_parameters),
     )
 
     try:
@@ -162,28 +159,35 @@ def _send_template_message(
             response = client.post(url, headers=_meta_headers(), json=payload)
 
         logger.info(
-            "Meta WhatsApp response context=%s status=%s body=%s",
+            "Meta WhatsApp response context=%s status=%s",
             log_context,
             response.status_code,
-            response.text,
         )
 
         if response.is_success:
             data = response.json()
             message_id = data.get("messages", [{}])[0].get("id", "unknown")
             logger.info(
-                "WhatsApp message sent to %s (%s) message_id=%s",
-                to_phone,
+                "WhatsApp message sent phone_suffix=%s context=%s message_id=%s",
+                phone_suffix(to_phone),
                 log_context,
                 message_id,
             )
+            metrics.incr("whatsapp_send_ok_total")
             return True
 
         _log_response_error(to_phone, log_context, response)
+        metrics.incr("whatsapp_send_failed_total")
         return False
 
     except Exception as exc:
-        logger.error("WhatsApp send failed to %s (%s): %s", to_phone, log_context, exc)
+        logger.error(
+            "WhatsApp send failed phone_suffix=%s context=%s error=%s",
+            phone_suffix(to_phone),
+            log_context,
+            type(exc).__name__,
+        )
+        metrics.incr("whatsapp_send_failed_total")
         return False
 
 

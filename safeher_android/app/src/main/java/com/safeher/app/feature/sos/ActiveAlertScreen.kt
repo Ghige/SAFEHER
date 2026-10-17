@@ -132,12 +132,24 @@ fun ActiveAlertScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error,
                             ),
-                            enabled = !uiState.isOffline,
                         ) {
                             Text(stringResource(R.string.sos_cancel_button))
                         }
+                        if (uiState.isOffline) {
+                            Text(
+                                text = stringResource(R.string.sos_cancel_offline),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    else -> LoadingSOS(message = stringResource(R.string.sos_loading))
+                    else -> {
+                        Text(
+                            text = stringResource(R.string.sos_cancel_returning),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

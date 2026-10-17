@@ -25,6 +25,14 @@ from pathlib import Path
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
+# Local imports
+try:
+    from dataset_metadata import infer_metadata, binary_train_label
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from dataset_metadata import infer_metadata, binary_train_label
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 SAMPLE_RATE   = 16000   # Must match inference.py
@@ -34,8 +42,11 @@ CHUNK_SAMPLES = SAMPLE_RATE * CHUNK_SECONDS
 RAW_DISTRESS_DIR = Path("data/raw/distress")
 RAW_NORMAL_DIR   = Path("data/raw/normal")
 RAW_NOISE_DIR    = Path("data/raw/noise")
+SPEECH_EMERGENCY_DIR = Path("data/speech/emergency_phrases")
+SPEECH_NORMAL_DIR = Path("data/speech/normal")
 PROCESSED_DIR    = Path("data/processed")
 SPLITS_DIR       = Path("data/splits")
+METADATA_DIR     = Path("data/metadata")
 
 # Augmentation noise levels (how loud background is mixed in)
 NOISE_LEVELS = [0.10, 0.20, 0.35]
@@ -139,9 +150,9 @@ def process_class(raw_dir, out_dir, label, do_augment, noise_dir):
     label_name = "distress" if label == 1 else "normal"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    wav_files = sorted(raw_dir.rglob("*.wav"))
+    wav_files = sorted(raw_dir.rglob("*.wav")) if raw_dir.exists() else []
     if not wav_files:
-        print(f"  ⚠️  No WAV files in {raw_dir} — run 00_convert_audio.py first")
+        print(f"  !! No WAV files in {raw_dir}")
         return []
 
     print(f"\n  [{label_name.upper()}]  {len(wav_files)} source files")
@@ -149,10 +160,16 @@ def process_class(raw_dir, out_dir, label, do_augment, noise_dir):
 
     for wav_path in tqdm(wav_files, desc=f"  {label_name}"):
         try:
+            meta = infer_metadata(wav_path)
+            # Skip RAVDESS/SUPPORT from binary training target (keep metadata for analysis)
+            mapped = binary_train_label(meta)
+            if mapped is None:
+                continue
+            use_label = mapped if label is None else label
+
             audio   = normalize(load_audio(wav_path))
             chunks  = split_chunks(audio)
-            parts   = wav_path.stem.split("_")
-            speaker = next((p for p in parts if p.startswith("spk")), "spk000")
+            speaker = meta.get("participant_id") or "spk000"
 
             for c_idx, chunk in enumerate(chunks):
                 versions = augment(chunk, noise_dir) if do_augment else [chunk]
@@ -163,17 +180,26 @@ def process_class(raw_dir, out_dir, label, do_augment, noise_dir):
                     save_wav(version, save_path)
                     records.append({
                         "filepath":  str(save_path),
-                        "label":     label,
+                        "label":     use_label,
                         "source":    wav_path.name,
                         "speaker":   speaker,
                         "chunk_idx": c_idx,
                         "aug_idx":   a_idx,
+                        "signal_type": meta.get("signal_type", ""),
+                        "language": meta.get("language", ""),
+                        "phrase": meta.get("phrase", ""),
+                        "emotion": meta.get("emotion", ""),
+                        "class_name": meta.get("class", ""),
+                        "source_dataset": meta.get("source", ""),
+                        "participant_id": meta.get("participant_id", speaker),
+                        "session_id": meta.get("session_id", ""),
+                        "original_path": str(wav_path),
                     })
 
         except Exception as e:
-            print(f"\n  ❌ Skipped {wav_path.name}: {e}")
+            print(f"\n  XX Skipped {wav_path.name}: {e}")
 
-    print(f"     → {len(records)} processed samples")
+    print(f"     -> {len(records)} processed samples")
     return records
 
 
@@ -209,20 +235,29 @@ def split_dataset(df):
 
 def main():
     print("=" * 55)
-    print("  SafeHer — Dataset Preparation Pipeline")
+    print("  SafeHer — Dataset Preparation Pipeline (multi-signal)")
     print("=" * 55)
 
     SPLITS_DIR.mkdir(parents=True, exist_ok=True)
+    METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    distress_records = process_class(RAW_DISTRESS_DIR, PROCESSED_DIR / "distress", 1, False,  RAW_NOISE_DIR)
+    # Existing distress/normal trees (DO NOT delete Screaming/)
+    distress_records = process_class(RAW_DISTRESS_DIR, PROCESSED_DIR / "distress", 1, False, RAW_NOISE_DIR)
     normal_records   = process_class(RAW_NORMAL_DIR,   PROCESSED_DIR / "normal",   0, False, RAW_NOISE_DIR)
 
-    if not distress_records and not normal_records:
-        print("\n  ❌ No audio files found. Add WAV files to data/raw/ first.")
+    # New speech layouts (additive)
+    speech_emergency = process_class(SPEECH_EMERGENCY_DIR, PROCESSED_DIR / "distress", 1, False, RAW_NOISE_DIR)
+    speech_normal = process_class(SPEECH_NORMAL_DIR, PROCESSED_DIR / "normal", 0, False, RAW_NOISE_DIR)
+
+    all_records = distress_records + normal_records + speech_emergency + speech_normal
+
+    if not all_records:
+        print("\n  XX No audio files found. Add WAV files to data/raw/ or data/speech/ first.")
         return
 
-    df = pd.DataFrame(distress_records + normal_records)
+    df = pd.DataFrame(all_records)
     df.to_csv(PROCESSED_DIR / "manifest.csv", index=False)
+    df.to_csv(METADATA_DIR / "sources_manifest.csv", index=False)
 
     splits_ok = False
     try:
@@ -232,18 +267,20 @@ def main():
         test_df.to_csv(SPLITS_DIR  / "test.csv",  index=False)
         splits_ok = True
     except ValueError as e:
-        print(f"\n  ⚠️  Split failed (need more files): {e}")
+        print(f"\n  !! Split failed (need more files): {e}")
 
     # Summary
     n_distress = len(df[df["label"] == 1])
     n_normal   = len(df[df["label"] == 0])
     n_speakers = df["speaker"].nunique()
+    n_phrase = len(df[df.get("signal_type", pd.Series(dtype=str)) == "emergency_phrase"]) if "signal_type" in df.columns else 0
 
     print("\n" + "=" * 55)
     print("  DATASET SUMMARY")
     print("=" * 55)
     print(f"  Distress samples  : {n_distress}")
     print(f"  Normal samples    : {n_normal}")
+    print(f"  Emergency phrase  : {n_phrase}")
     print(f"  Total             : {len(df)}")
     print(f"  Unique speakers   : {n_speakers}")
 
@@ -254,11 +291,12 @@ def main():
 
     print()
     if n_distress < 200:
-        print(f"  ⚠️  {n_distress} distress samples — target 800+ before training")
+        print(f"  !! {n_distress} distress samples — target 800+ before training")
     else:
-        print("  ✅ Ready — run: python 02_train_model.py")
+        print("  OK — run: python 02_train_model.py")
     if n_speakers < 5:
-        print(f"  ⚠️  Only {n_speakers} speakers — collect from more volunteers")
+        print(f"  !! Only {n_speakers} speakers — collect from more volunteers")
+    print("  Note: RAVDESS/emotional clips are SUPPORT only (excluded from binary labels).")
     print("=" * 55)
 
 

@@ -8,6 +8,8 @@ package com.safeher.app.services.ai
  */
 interface AudioInferenceEngine {
     val isAvailable: Boolean
+    val lastLatencyMs: Long?
+    val lastError: String?
 
     /** @return distress score 0–100, or null if inference cannot run */
     suspend fun inferDistressScore(audioSamples: ShortArray, sampleRate: Int): Double?

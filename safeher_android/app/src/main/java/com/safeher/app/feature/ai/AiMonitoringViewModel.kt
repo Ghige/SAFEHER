@@ -155,6 +155,39 @@ class AiMonitoringViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            coordinator.modelStatus.collect { status ->
+                _uiState.update {
+                    it.copy(
+                        modelStatusSummary =
+                            "audio=${status.audioAvailable} speech=${status.speechMode} " +
+                                "movement=${status.movementAvailable} contract=${status.contractVersion}",
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            coordinator.inferenceSnapshot.collect { snap ->
+                _uiState.update {
+                    it.copy(
+                        localSdeState = snap?.localState,
+                        localSdeAction = snap?.localAction,
+                        audioLatencyMs = snap?.audioLatencyMs,
+                        detectedPhrase = snap?.detectedPhrase,
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            coordinator.confirmSecondsRemaining.collect { seconds ->
+                _uiState.update { it.copy(confirmSecondsRemaining = seconds) }
+            }
+        }
+        viewModelScope.launch {
+            coordinator.confirmPromptKind.collect { kind ->
+                _uiState.update { it.copy(confirmPromptKind = kind?.name) }
+            }
+        }
+        viewModelScope.launch {
             coordinator.events.collect { event ->
                 when (event) {
                     AiCoordinatorEvent.NavigateToSosCountdown ->
@@ -162,7 +195,27 @@ class AiMonitoringViewModel @Inject constructor(
                     AiCoordinatorEvent.NavigateToActiveAlert ->
                         _events.emit(AiMonitoringEvent.NavigateToActiveAlert)
                     is AiCoordinatorEvent.ShowEmergencyConfirmation -> {
-                        _uiState.update { it.copy(pendingEmergencyConfirmation = true) }
+                        _uiState.update {
+                            it.copy(
+                                pendingEmergencyConfirmation = true,
+                                confirmPromptKind = event.promptKind.name,
+                                confirmSecondsRemaining = event.countdownSeconds,
+                                snackbarMessage = null,
+                            )
+                        }
+                    }
+                    is AiCoordinatorEvent.ConfirmSessionTick -> {
+                        _uiState.update { it.copy(confirmSecondsRemaining = event.secondsRemaining) }
+                    }
+                    is AiCoordinatorEvent.ConfirmSessionEnded -> {
+                        _uiState.update {
+                            it.copy(
+                                pendingEmergencyConfirmation = false,
+                                confirmPromptKind = null,
+                                confirmSecondsRemaining = 0,
+                                snackbarMessage = event.userMessage,
+                            )
+                        }
                     }
                 }
             }

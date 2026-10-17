@@ -30,6 +30,6 @@ class AiDatasetSample(Base):
     duration_seconds = Column(Float, nullable=True)
     features = Column(JSONB, nullable=True)
     device_info = Column(JSONB, nullable=True)
-    storage_path = Column(Text, nullable=False)
+    storage_path = Column(Text, nullable=True)
     status = Column(String(20), nullable=False, default="queued")
     recorded_at = Column(DateTime(timezone=True), server_default=func.now())

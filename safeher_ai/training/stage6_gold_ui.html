@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SafeHer Stage 6 — Gold review</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3240;
+    --tx:#e6edf3; --dim:#8b98a8; --accent:#4c9aff;
+    --distress:#f85149; --hardneg:#d29922; --reject:#8b949e; --amb:#a371f7;
+    --ok:#3fb950;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;
+       background:var(--bg);color:var(--tx)}
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;
+         background:var(--panel);border-bottom:1px solid var(--line);
+         position:sticky;top:0;z-index:10;flex-wrap:wrap}
+  h1{font-size:14px;margin:0;font-weight:600}
+  .bar{flex:1;min-width:140px;height:7px;background:#222a36;border-radius:4px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#2ea043,#4c9aff);width:0}
+  .muted{color:var(--dim);font-size:12px}
+  select,button,input{font:inherit;color:var(--tx);background:var(--panel2);
+        border:1px solid var(--line);border-radius:7px;padding:6px 10px}
+  button{cursor:pointer}
+  button:hover{border-color:#3d4c63}
+  input#reviewer{min-width:140px}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel2)}
+  .pill.warn{border-color:var(--hardneg);color:#e3b341}
+  .pill.ok{border-color:var(--ok);color:var(--ok)}
+  main{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 108px)}
+  aside{border-right:1px solid var(--line);overflow-y:auto;background:#11151b}
+  .row{padding:8px 12px;border-bottom:1px solid #1b212b;cursor:pointer;display:flex;gap:8px;align-items:center}
+  .row:hover{background:#171d26}
+  .row.sel{background:#1d2735;box-shadow:inset 3px 0 0 var(--accent)}
+  .row .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#333c4a;flex:none}
+  .dot.DISTRESS{background:var(--distress)} .dot.HARD_NEGATIVE{background:var(--hardneg)}
+  .dot.REJECT{background:var(--reject)} .dot.AMBIGUOUS{background:var(--amb)}
+  section{overflow-y:auto;padding:20px 26px}
+  .title{font-size:18px;font-weight:600;margin:0 0 4px;word-break:break-word}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:13px}
+  .k{color:var(--dim)}
+  .verdicts{display:flex;gap:8px;flex-wrap:wrap}
+  .v{flex:1;min-width:130px;padding:12px;border-radius:10px;font-weight:600;
+     border:1.5px solid var(--line);background:var(--panel2);text-align:left}
+  .v small{display:block;font-weight:400;color:var(--dim);font-size:11px;margin-top:3px}
+  .v.on{color:#06111f}
+  .v[data-v=DISTRESS].on{background:var(--distress);border-color:var(--distress)}
+  .v[data-v=HARD_NEGATIVE].on{background:var(--hardneg);border-color:var(--hardneg)}
+  .v[data-v=REJECT].on{background:var(--reject);border-color:var(--reject)}
+  .v[data-v=AMBIGUOUS].on{background:var(--amb);border-color:var(--amb)}
+  textarea{width:100%;background:var(--panel2);color:var(--tx);border:1px solid var(--line);
+           border-radius:8px;padding:9px;font:inherit;resize:vertical;min-height:52px}
+  audio{width:100%;margin-top:8px}
+  .targets{display:flex;gap:18px;padding:8px 18px;background:#11151b;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .targets b{color:var(--accent)}
+  .others{font-size:12px;color:var(--dim);margin-top:8px}
+  .banner{background:#2a2110;border:1px solid #6e5218;color:#e3b341;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:12.5px}
+  kbd{background:#0b0e13;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Stage 6 · Gold review (dual DISTRESS)</h1>
+  <label class="muted">reviewer_id
+    <input id="reviewer" placeholder="your_id" autocomplete="username">
+  </label>
+  <button id="reload">Load</button>
+  <div class="bar"><i id="pfill"></i></div>
+  <span class="muted" id="pnum">0 / 0</span>
+  <select id="filter">
+    <option value="todo">My unjudged</option>
+    <option value="all">All</option>
+    <option value="done">My judged</option>
+    <option value="need2">Needs 2nd DISTRESS review</option>
+    <option value="nolicense">License blocked (UNKNOWN)</option>
+  </select>
+  <span class="pill warn" id="policy">no auto-promote</span>
+</header>
+<div class="targets" id="targets">Loading progress…</div>
+<main>
+  <aside id="list"></aside>
+  <section id="detail">
+    <p class="muted">Set reviewer_id and click Load. P0 clips first.</p>
+  </section>
+</main>
+<script>
+const VERDICTS = ["DISTRESS","HARD_NEGATIVE","REJECT","AMBIGUOUS"];
+let ITEMS = [], MINE = {}, ALL = {}, IDX = 0, PROGRESS = {};
+
+function rid(){ return (document.getElementById("reviewer").value || "").trim(); }
+
+async function load(){
+  const r = rid();
+  if(!r){ alert("reviewer_id is required"); return; }
+  localStorage.setItem("s6_reviewer", r);
+  const res = await fetch("/api/items?reviewer_id="+encodeURIComponent(r));
+  const data = await res.json();
+  ITEMS = data.items || [];
+  MINE = data.my_verdicts || {};
+  ALL = data.all_reviews_by_qid || {};
+  PROGRESS = data.progress || {};
+  renderTargets();
+  renderList();
+  if(ITEMS.length) select(0);
+}
+
+function renderTargets(){
+  const c = PROGRESS;
+  const d = c.confirmed_DISTRESS||0, hn = c.verified_HARD_NEGATIVE_stage6||0;
+  const rd = c.remaining_confirmed_DISTRESS??500, rh = c.remaining_additional_HARD_NEGATIVE??999;
+  document.getElementById("targets").innerHTML =
+    `<span>Confirmed DISTRESS: <b>${d}</b> / 500 &nbsp; remaining <b>${rd}</b></span>`+
+    `<span>Verified HN (new): <b>${hn}</b> / 999 additional &nbsp; remaining <b>${rh}</b></span>`+
+    `<span>Legacy HN: <b>${c.legacy_HARD_NEGATIVE||1}</b></span>`+
+    `<span>Awaiting 2nd DISTRESS reviewer: <b>${c.distress_awaiting_second_reviewer||0}</b></span>`;
+  const judged = Object.keys(MINE).filter(k => MINE[k].manual_verdict).length;
+  document.getElementById("pnum").textContent = `${judged} / ${ITEMS.length}`;
+  document.getElementById("pfill").style.width = (ITEMS.length? (100*judged/ITEMS.length):0)+"%";
+}
+
+function filtered(){
+  const f = document.getElementById("filter").value;
+  return ITEMS.map((it,i)=>({it,i})).filter(({it})=>{
+    const mine = MINE[it.queue_id];
+    const others = ALL[it.queue_id]||[];
+    if(f==="todo") return !(mine && mine.manual_verdict);
+    if(f==="done") return !!(mine && mine.manual_verdict);
+    if(f==="need2"){
+      const distress = others.filter(o => o.manual_verdict==="DISTRESS");
+      const rids = new Set(distress.map(o=>o.reviewer_id));
+      return rids.size===1 && !(mine && mine.manual_verdict==="DISTRESS" && !rids.has(rid()));
+    }
+    if(f==="nolicense") return it.license_status==="UNKNOWN" || it.license_status==="QUARANTINE";
+    return true;
+  });
+}
+
+function renderList(){
+  const box = document.getElementById("list");
+  box.innerHTML = "";
+  for(const {it,i} of filtered()){
+    const div = document.createElement("div");
+    div.className = "row"+(i===IDX?" sel":"");
+    const v = (MINE[it.queue_id]||{}).manual_verdict||"";
+    div.innerHTML = `<span class="dot ${v}"></span><span class="t">${it.priority} · ${it.filename}</span>`;
+    div.onclick = () => select(i);
+    box.appendChild(div);
+  }
+}
+
+function select(i){
+  IDX = i;
+  renderList();
+  const it = ITEMS[i];
+  if(!it) return;
+  const mine = MINE[it.queue_id]||{};
+  const others = (ALL[it.queue_id]||[]).filter(o => o.reviewer_id !== rid());
+  const licOk = it.license_status==="SAFE" || it.license_status==="ATTRIBUTION_REQUIRED";
+  const detail = document.getElementById("detail");
+  detail.innerHTML = `
+    <div class="banner">Heuristic / folder labels are <b>not</b> gold.
+      Confirmed DISTRESS needs <b>two different reviewer_ids</b> both choosing DISTRESS
+      and license SAFE or ATTRIBUTION_REQUIRED. Keys: <kbd>1</kbd> DISTRESS
+      <kbd>2</kbd> HARD_NEGATIVE <kbd>3</kbd> REJECT <kbd>4</kbd> AMBIGUOUS
+      <kbd>N</kbd> next</div>
+    <p class="title">${it.filename}</p>
+    <p class="muted">${it.source_bucket} · ${it.queue_id}</p>
+    <div class="card">
+      <div class="grid">
+        <div class="k">source_id</div><div>${it.source_id}</div>
+        <div class="k">license_status</div><div>${it.license_status} ${licOk?'<span class="pill ok">trainable if gold</span>':'<span class="pill warn">blocked from confirmed DISTRESS</span>'}</div>
+        <div class="k">label_status</div><div>${it.label_status} (heuristic — do not auto-promote)</div>
+        <div class="k">heuristic_label</div><div>${it.heuristic_label}</div>
+        <div class="k">hint</div><div>${it.review_hint||"—"}</div>
+        <div class="k">audio</div><div>${it.audio_available? "available":"<span class='pill warn'>MISSING FILE</span>"}</div>
+      </div>
+      ${it.audio_available? `<audio id="player" controls src="/audio/${it.queue_id}"></audio>`:""}
+    </div>
+    <div class="card">
+      <div class="verdicts" id="vb"></div>
+      <p class="muted" style="margin:10px 0 4px">notes</p>
+      <textarea id="notes">${mine.notes||""}</textarea>
+      <div class="others">Other reviewers: ${
+        others.length? others.map(o=>`${o.reviewer_id}=${o.manual_verdict}`).join(", ") : "none yet"
+      }</div>
+    </div>`;
+  const vb = document.getElementById("vb");
+  for(const v of VERDICTS){
+    const b = document.createElement("button");
+    b.className = "v"+(mine.manual_verdict===v?" on":"");
+    b.dataset.v = v;
+    b.innerHTML = v+`<small>${v==="DISTRESS"?"needs 2nd independent review":"human gold (not heuristic)"}</small>`;
+    b.onclick = () => submit(v);
+    vb.appendChild(b);
+  }
+  const p = document.getElementById("player");
+  if(p) p.play().catch(()=>{});
+}
+
+async function submit(verdict){
+  const r = rid();
+  if(!r){ alert("reviewer_id required"); return; }
+  const it = ITEMS[IDX];
+  const notes = (document.getElementById("notes")||{}).value||"";
+  const res = await fetch("/api/verdict", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      queue_id: it.queue_id,
+      reviewer_id: r,
+      manual_verdict: verdict,
+      notes
+    })
+  });
+  const data = await res.json();
+  if(!data.ok){ alert(data.error||"save failed"); return; }
+  MINE[it.queue_id] = {
+    queue_id: it.queue_id,
+    manual_verdict: verdict,
+    reviewer_id: r,
+    notes,
+    review_timestamp: new Date().toISOString()
+  };
+  PROGRESS = data.progress || PROGRESS;
+  // refresh others via light reload of progress counts
+  renderTargets();
+  // advance to next unjudged
+  const next = ITEMS.findIndex((x,i)=> i>IDX && !(MINE[x.queue_id]&&MINE[x.queue_id].manual_verdict));
+  if(next>=0) select(next);
+  else renderList();
+}
+
+document.getElementById("reload").onclick = load;
+document.getElementById("filter").onchange = ()=>{ renderList(); };
+document.getElementById("reviewer").value = localStorage.getItem("s6_reviewer")||"";
+document.addEventListener("keydown", e=>{
+  if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT") return;
+  const map = {Digit1:"DISTRESS",Digit2:"HARD_NEGATIVE",Digit3:"REJECT",Digit4:"AMBIGUOUS",
+               Numpad1:"DISTRESS",Numpad2:"HARD_NEGATIVE",Numpad3:"REJECT",Numpad4:"AMBIGUOUS"};
+  if(map[e.code]) { e.preventDefault(); submit(map[e.code]); }
+  if(e.code==="KeyN"){ e.preventDefault(); if(IDX+1<ITEMS.length) select(IDX+1); }
+});
+if(document.getElementById("reviewer").value) load();
+</script>
+</body>
+</html>

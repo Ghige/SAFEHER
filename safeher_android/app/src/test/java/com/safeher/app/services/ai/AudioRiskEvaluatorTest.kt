@@ -13,13 +13,14 @@ class AudioRiskEvaluatorTest {
     )
 
     @Test
-    fun highRisk_requiresMultipleSignalsAndDuration() {
+    fun highRisk_sustainedDistress_withoutRequiringVolumeSpike() {
+        // Quiet-ish RMS but sustained model confidence — volume must NOT block HIGH
         val features = AudioFrameFeatures(
-            rmsEnergy = 0.2,
-            peakAmplitude = 0.8,
+            rmsEnergy = 0.04,
+            peakAmplitude = 0.2,
             zeroCrossingRate = 0.1,
             dominantFrequencyHz = 400.0,
-            spectralCentroidHz = 2500.0,
+            spectralCentroidHz = 1300.0,
         )
         val assessment = AudioRiskEvaluator.evaluate(
             config = config,
@@ -30,9 +31,59 @@ class AudioRiskEvaluatorTest {
             baselineRms = 0.05,
             baselineCentroid = 1200.0,
             isSingleSpike = false,
+            phraseScore = 0.0,
         )
         assertEquals(AudioRiskLevel.HIGH, assessment.riskLevel)
         assertTrue(assessment.shouldQueryBackend)
+        assertFalse(assessment.volumeSpike)
+    }
+
+    @Test
+    fun quietHelpMe_phrase_canReachMediumWithoutVolume() {
+        val features = AudioFrameFeatures(
+            rmsEnergy = 0.03,
+            peakAmplitude = 0.15,
+            zeroCrossingRate = 0.08,
+            dominantFrequencyHz = 200.0,
+            spectralCentroidHz = 1100.0,
+        )
+        val assessment = AudioRiskEvaluator.evaluate(
+            config = config,
+            rawConfidence = 30.0,
+            rollingAverage = 28.0,
+            durationSeconds = 2.0,
+            features = features,
+            baselineRms = 0.05,
+            baselineCentroid = 1200.0,
+            isSingleSpike = false,
+            phraseScore = 0.95,
+        )
+        assertEquals(AudioRiskLevel.MEDIUM, assessment.riskLevel)
+        assertTrue(assessment.phraseDetected)
+    }
+
+    @Test
+    fun loudOnly_withoutDistress_staysLow() {
+        val features = AudioFrameFeatures(
+            rmsEnergy = 0.25,
+            peakAmplitude = 0.9,
+            zeroCrossingRate = 0.12,
+            dominantFrequencyHz = 200.0,
+            spectralCentroidHz = 1800.0,
+        )
+        val assessment = AudioRiskEvaluator.evaluate(
+            config = config,
+            rawConfidence = 20.0,
+            rollingAverage = 18.0,
+            durationSeconds = 3.0,
+            features = features,
+            baselineRms = 0.05,
+            baselineCentroid = 1200.0,
+            isSingleSpike = false,
+            phraseScore = 0.0,
+        )
+        assertEquals(AudioRiskLevel.LOW, assessment.riskLevel)
+        assertFalse(assessment.shouldQueryBackend)
     }
 
     @Test
